@@ -1,0 +1,58 @@
+name: CORE
+options:
+  bundleIdPrefix: app.core
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    TARGETED_DEVICE_FAMILY: "1"       # iPhone only for the MVP
+    DEVELOPMENT_TEAM: ""              # set your team ID
+
+targets:
+  CORE:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    info:
+      path: Config/Info.plist
+      properties:
+        CFBundleDisplayName: CORE
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arkit]
+        NSCameraUsageDescription: >-
+          CORE uses the camera to place your creature in your world.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+    entitlements:
+      path: Config/CORE.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.app.core.shared
+    dependencies:
+      - target: ActivityMonitor
+        embed: true
+
+  ActivityMonitor:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Extensions/ActivityMonitor
+    info:
+      path: Config/ActivityMonitor-Info.plist
+      properties:
+        CFBundleDisplayName: CORE Activity Monitor
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ActivityMonitorExtension
+    entitlements:
+      path: Config/ActivityMonitor.entitlements
+      properties:
+        com.apple.developer.family-controls: true
+        com.apple.security.application-groups:
+          - group.app.core.shared
