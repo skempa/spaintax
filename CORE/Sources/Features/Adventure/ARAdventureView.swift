@@ -71,41 +71,34 @@ struct ARAdventureView: UIViewRepresentable {
             startWandering()
         }
 
-        /// The creature is a billboarded plane textured with the player's
-        /// processed drawing, floating just above the floor with a soft
-        /// shadow disc — readable from any angle and faithful to what
-        /// they drew.
+        /// A real 3D model of the player's drawing: voxelised, inflated
+        /// and mesh-built by `VoxelMeshBuilder`. Standing on the detected
+        /// floor with a soft shadow disc, viewable from every angle.
         private func makeCreatureEntity() -> ModelEntity {
             let scale = Float(engine.creature.appearance.scale)
-            let height: Float = 0.28 * scale
+            let height: Float = 0.30 * scale
 
-            var material = UnlitMaterial()
+            let entity: ModelEntity
             if let image = GameStore.shared.loadImage(named: engine.creature.appearance.processedImageFile),
-               let cgImage = image.cgImage,
-               let texture = try? TextureResource.generate(from: cgImage, options: .init(semantic: .color)) {
-                material.color = .init(texture: .init(texture))
-                material.blending = .transparent(opacity: 1.0)
+               let grid = VoxelExtractor.fromDrawing(image),
+               let voxel = try? VoxelMeshBuilder.entity(for: grid, targetHeight: height) {
+                entity = voxel
             } else {
-                material.color = .init(tint: .white)
+                // Fallback: a plain cube so the session still works.
+                entity = ModelEntity(
+                    mesh: .generateBox(size: height * 0.6),
+                    materials: [SimpleMaterial(color: .white, isMetallic: false)]
+                )
+                entity.position.y = height * 0.3
             }
 
-            let mesh = MeshResource.generatePlane(width: height, height: height)
-            let entity = ModelEntity(mesh: mesh, materials: [material])
-            entity.position = [0, height / 2 + 0.02, 0]
-
             // Shadow disc grounds the creature visually.
-            let shadowMesh = MeshResource.generatePlane(width: height * 0.8, depth: height * 0.5)
+            let shadowMesh = MeshResource.generatePlane(width: height * 0.9, depth: height * 0.6)
             var shadowMaterial = UnlitMaterial()
             shadowMaterial.color = .init(tint: UIColor.black.withAlphaComponent(0.35))
             let shadow = ModelEntity(mesh: shadowMesh, materials: [shadowMaterial])
-            shadow.position = [0, -height / 2, 0]
+            shadow.position = [0, 0.005, 0]
             entity.addChild(shadow)
-
-            // Billboard toward the camera on iOS 18+; on earlier targets
-            // the sprite simply faces its spawn orientation.
-            if #available(iOS 18.0, *) {
-                entity.components.set(BillboardComponent())
-            }
 
             return entity
         }
@@ -152,23 +145,31 @@ struct ARAdventureView: UIViewRepresentable {
             }
         }
 
-        /// Enemies appear as glowing rifts beside the creature.
+        /// Enemies materialise as voxel creatures of their own beside the
+        /// player's companion.
         private func spawnEnemy(_ enemy: Enemy) {
             guard let anchor = creatureAnchor else { return }
-            let size: Float = enemy.isBoss ? 0.22 : 0.12
-            let mesh = MeshResource.generateSphere(radius: size)
-            var material = UnlitMaterial()
-            material.color = .init(tint: enemy.isBoss
-                ? UIColor.purple.withAlphaComponent(0.9)
-                : UIColor.red.withAlphaComponent(0.85))
-            let entity = ModelEntity(mesh: mesh, materials: [material])
-            entity.position = [0.35, size + 0.02, -0.1]
+            let height: Float = enemy.isBoss ? 0.34 : 0.18
+            let entity: ModelEntity
+            if let voxel = try? VoxelMeshBuilder.entity(
+                for: VoxelExtractor.enemyBlob(for: enemy.kind),
+                targetHeight: height
+            ) {
+                entity = voxel
+            } else {
+                entity = ModelEntity(
+                    mesh: .generateSphere(radius: height / 2),
+                    materials: [SimpleMaterial(color: .red, isMetallic: false)]
+                )
+            }
+            entity.position = [0.38, 0.01, -0.1]
+            entity.orientation = simd_quatf(angle: -0.5, axis: [0, 1, 0])
             anchor.addChild(entity)
             enemyEntity = entity
 
             // Menacing pulse.
             var pulse = entity.transform
-            pulse.scale = SIMD3(repeating: 1.15)
+            pulse.scale *= 1.15
             entity.move(to: pulse, relativeTo: anchor, duration: 0.6, timingFunction: .easeInOut)
         }
 

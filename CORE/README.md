@@ -24,7 +24,7 @@ Time, fragments, evolution, and permanent persistence.
 | Attention Score → Adventure Time formula | ✅ reproduces all worked examples from the spec (§6): 105 m distraction/2 h total → 2:30, light day → 5:00, exceptional → up to 7:00. All constants in `Tuning.swift` |
 | Screen Time integration (FamilyControls / DeviceActivity) | ✅ threshold-ladder design + monitor extension; **entitlement required** (see below). Simulator uses a debug provider |
 | Camp: status, wandering creature, condition messages, ENTER WORLD | ✅ |
-| 5-minute AR adventure (RealityKit): floor anchoring, creature placement, idle/wander, enemy rifts | ✅ (billboarded sprite of the player's own drawing) |
+| 5-minute AR adventure (RealityKit): floor anchoring, creature placement, idle/wander, enemy encounters | ✅ true 3D voxel mesh generated from the player's drawing (`VoxelExtractor` + `VoxelMeshBuilder`); enemies are procedural voxel creatures |
 | Real-time gesture combat: tap attack, swipe dodge, hold ability | ✅ |
 | 3–5 enemy types + boss (Shrine Warden) | ✅ 5 kinds |
 | Discoveries, chests, items, Core fragments | ✅ |
@@ -76,6 +76,27 @@ Set your development team in `project.yml` (or Xcode signing settings).
   Settings; AR is replaced with a painted Meadow backdrop.
 - **Device**: AR works immediately (camera permission). Real screen-time
   data additionally requires the **Family Controls entitlement**.
+
+## Testing the AR
+
+AR requires a physical iPhone — the simulator has no camera or ARKit.
+
+1. Open the project (see Building), plug in an iPhone, select it as the
+   run destination, and hit Run. A free Apple ID personal team is enough
+   for on-device installs (re-sign every 7 days; a paid account removes
+   that limit).
+2. First launch asks for camera permission; draw a creature, reach camp,
+   tap ENTER WORLD.
+3. Point the phone at a well-lit floor and pan slowly — the coaching
+   overlay guides the scan. Once a horizontal plane is detected the
+   creature anchors to it: a 3D voxel model generated from the drawing
+   (`VoxelExtractor.fromDrawing` → `VoxelMeshBuilder.entity`), which you
+   can walk around and view from any angle. Enemies appear beside it as
+   procedural voxel creatures.
+
+The creature-generation pipeline (drawing → voxel grid → inflated mesh)
+matches the web prototype exactly, so what players see in the browser
+demo is what they get in AR.
 
 ## Screen Time: how it works and what Apple requires
 
