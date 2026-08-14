@@ -9,7 +9,19 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     TARGETED_DEVICE_FAMILY: "1"       # iPhone only for the MVP
-    DEVELOPMENT_TEAM: ""              # set your team ID
+    DEVELOPMENT_TEAM: ""              # set your team ID, or pick it in Xcode signing settings
+
+# ---------------------------------------------------------------------------
+# Default configuration: NO special entitlements, single app target.
+# This builds and runs on a free Apple ID personal team with zero setup —
+# the game is fully playable; screen-time reads as zero (full 5:00 daily).
+#
+# To enable real Screen Time integration (requires a paid Apple Developer
+# account, and Apple's Family Controls distribution approval to ship):
+#   1. Uncomment the `entitlements` block below and the ActivityMonitor
+#      target + dependency.
+#   2. Run `xcodegen generate` again.
+# ---------------------------------------------------------------------------
 
 targets:
   CORE:
@@ -28,31 +40,31 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         ITSAppUsesNonExemptEncryption: false
-    entitlements:
-      path: Config/CORE.entitlements
-      properties:
-        com.apple.developer.family-controls: true
-        com.apple.security.application-groups:
-          - group.app.core.shared
-    dependencies:
-      - target: ActivityMonitor
-        embed: true
+    # entitlements:
+    #   path: Config/CORE.entitlements
+    #   properties:
+    #     com.apple.developer.family-controls: true
+    #     com.apple.security.application-groups:
+    #       - group.app.core.shared
+    # dependencies:
+    #   - target: ActivityMonitor
+    #     embed: true
 
-  ActivityMonitor:
-    type: app-extension
-    platform: iOS
-    sources:
-      - Extensions/ActivityMonitor
-    info:
-      path: Config/ActivityMonitor-Info.plist
-      properties:
-        CFBundleDisplayName: CORE Activity Monitor
-        NSExtension:
-          NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
-          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ActivityMonitorExtension
-    entitlements:
-      path: Config/ActivityMonitor.entitlements
-      properties:
-        com.apple.developer.family-controls: true
-        com.apple.security.application-groups:
-          - group.app.core.shared
+  # ActivityMonitor:
+  #   type: app-extension
+  #   platform: iOS
+  #   sources:
+  #     - Extensions/ActivityMonitor
+  #   info:
+  #     path: Config/ActivityMonitor-Info.plist
+  #     properties:
+  #       CFBundleDisplayName: CORE Activity Monitor
+  #       NSExtension:
+  #         NSExtensionPointIdentifier: com.apple.deviceactivity.monitor-extension
+  #         NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ActivityMonitorExtension
+  #   entitlements:
+  #     path: Config/ActivityMonitor.entitlements
+  #     properties:
+  #       com.apple.developer.family-controls: true
+  #       com.apple.security.application-groups:
+  #         - group.app.core.shared
