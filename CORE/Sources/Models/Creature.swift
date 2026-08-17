@@ -6,6 +6,9 @@ struct Creature: Codable, Equatable {
     var createdAt: Date
     var appearance: CreatureAppearance
     var analysis: DrawingAnalysis
+    /// Player's own description of the creature — steers the HD
+    /// generation's interpretation (optional; old saves decode).
+    var creatureDescription: String?
 
     /// Cores collected, in acquisition order. The first is AI-assigned.
     var cores: [ElementalCore]

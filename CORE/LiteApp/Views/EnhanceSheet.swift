@@ -9,6 +9,7 @@ struct EnhanceSheet: View {
     @State private var started = false
     @State private var keyInput = ""
     @State private var hasKey = KeychainHelper.tripoKey() != nil
+    @State private var descriptionInput = ""
 
     private let stages: [(TripoCreatureEnhancer.Stage, String)] = [
         (.uploading,  "Upload your drawing"),
@@ -58,6 +59,23 @@ struct EnhanceSheet: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
+
+                // The player's half of the prompt; style + rig pose are
+                // appended automatically.
+                TextField(
+                    "Describe your creature (optional) — species, personality, details…",
+                    text: $descriptionInput,
+                    axis: .vertical
+                )
+                .lineLimit(2...4)
+                .padding(12)
+                .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 24)
+                .onAppear {
+                    if descriptionInput.isEmpty {
+                        descriptionInput = app.creature?.creatureDescription ?? ""
+                    }
+                }
             }
 
             if case .failed(let message) = enhancer.stage {
@@ -164,8 +182,9 @@ struct EnhanceSheet: View {
                         guard hasKey else { return }
                     }
                     guard let key = KeychainHelper.tripoKey() else { return }
+                    app.setCreatureDescription(descriptionInput)
                     started = true
-                    enhancer.run(apiKey: key) { result in
+                    enhancer.run(apiKey: key, description: descriptionInput) { result in
                         app.applyEnhancement(result)
                     }
                 } label: {

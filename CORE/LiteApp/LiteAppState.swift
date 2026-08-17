@@ -319,6 +319,15 @@ final class LiteAppState: ObservableObject {
 
     var hasTripoKey: Bool { KeychainHelper.tripoKey() != nil }
 
+    /// Persists the player's creature description (drives HD generation).
+    func setCreatureDescription(_ text: String) {
+        guard var creature = gameState.creature else { return }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        creature.creatureDescription = trimmed.isEmpty ? nil : trimmed
+        gameState.creature = creature
+        persist()
+    }
+
     /// Drops a broken HD model so generation can be retried; keeps the
     /// concept art.
     func discardHDModel() {

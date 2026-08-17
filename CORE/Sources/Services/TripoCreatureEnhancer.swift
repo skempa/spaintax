@@ -59,17 +59,27 @@ final class TripoCreatureEnhancer: ObservableObject {
 
     /// Bumped with every pipeline change; shown in the UI so stale-build
     /// confusion is impossible.
-    static let pipelineRevision = "r4"
+    static let pipelineRevision = "r5"
 
-    /// The pose-canonicalising interpretation prompt — Tripo's own
-    /// rigging guidance baked in: limbs separated, T-pose.
-    static let conceptPrompt = """
-    cute stylized 3D game creature, faithful to this child-like drawing, \
-    keep its exact colors, proportions and distinctive features, \
+    /// Concept prompt = [player's creature description] + hardcoded
+    /// style scaffold + hardcoded rig-friendly pose block (always last —
+    /// Tripo's own auto-rig guidance: T-pose, limbs separated).
+    static let styleBlock = """
+    high-quality stylized 3D game creature inspired by this drawing, \
+    appealing character design, keep its distinctive features and color palette, \
+    polished game asset
+    """
+    static let poseBlock = """
     standing upright in T-pose, arms spread away from the body, \
     legs slightly apart, limbs clearly separated from the torso, \
     full body, plain background
     """
+
+    static func prompt(description: String?) -> String {
+        let trimmed = description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return (trimmed.isEmpty ? [styleBlock, poseBlock] : [trimmed, styleBlock, poseBlock])
+            .joined(separator: ", ")
+    }
 
     private var runTask: Task<Void, Never>?
 
@@ -81,14 +91,14 @@ final class TripoCreatureEnhancer: ObservableObject {
 
     /// Runs the pipeline; calls `completion` on success with files saved
     /// into the GameStore directory.
-    func run(apiKey: String, completion: @escaping (Result) -> Void) {
+    func run(apiKey: String, description: String? = nil, completion: @escaping (Result) -> Void) {
         guard stage == .idle || stage.isFailure else { return }
         let client = TripoClient(apiKey: apiKey)
 
         runTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let result = try await self.pipeline(client: client)
+                let result = try await self.pipeline(client: client, description: description)
                 self.stage = .done
                 completion(result)
             } catch is CancellationError {
@@ -100,7 +110,7 @@ final class TripoCreatureEnhancer: ObservableObject {
         }
     }
 
-    private func pipeline(client: TripoClient) async throws -> Result {
+    private func pipeline(client: TripoClient, description: String?) async throws -> Result {
         let store = GameStore.shared
 
         // 1. Upload the original drawing.
@@ -118,7 +128,7 @@ final class TripoCreatureEnhancer: ObservableObject {
         do {
             let conceptTaskID = try await client.createTask("generation/image-to-image", body: [
                 "file": ["file_token": drawingToken],
-                "prompt": Self.conceptPrompt,
+                "prompt": Self.prompt(description: description),
             ])
             let conceptTask = try await client.waitForTask(conceptTaskID, timeout: 300)
             if let imageURL = conceptTask.output?.primaryImageURL {

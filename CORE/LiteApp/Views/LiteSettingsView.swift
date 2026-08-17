@@ -14,6 +14,7 @@ struct LiteSettingsView: View {
     #endif
     @State private var tripoKey = KeychainHelper.tripoKey() ?? ""
     @State private var keySaved = KeychainHelper.tripoKey() != nil
+    @State private var descriptionInput = ""
 
     private func saveKey() {
         KeychainHelper.saveTripoKey(tripoKey.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -71,6 +72,29 @@ struct LiteSettingsView: View {
                 }
                 #endif
 
+                Section {
+                    TextField(
+                        "Describe your creature — species, personality, details…",
+                        text: $descriptionInput,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...5)
+                    .onSubmit { app.setCreatureDescription(descriptionInput) }
+                    Button("Save description") { app.setCreatureDescription(descriptionInput) }
+                        .disabled(descriptionInput == (app.creature?.creatureDescription ?? ""))
+                    if app.creature?.appearance.tripoModelFile != nil {
+                        Button("Regenerate HD model", role: .destructive) {
+                            app.setCreatureDescription(descriptionInput)
+                            app.discardHDModel()
+                            dismiss()
+                        }
+                    }
+                } header: {
+                    Text("Creature")
+                } footer: {
+                    Text("Your description steers the HD generation; the game-art style and rig-friendly pose are added automatically. Regenerating discards the current HD model (blocks return until the new run finishes) and spends Tripo credits.")
+                }
+
                 if let diag = hdModelDiagnostics() {
                     Section {
                         LabeledContent("File", value: diag.name)
@@ -91,6 +115,11 @@ struct LiteSettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear {
+                if descriptionInput.isEmpty {
+                    descriptionInput = app.creature?.creatureDescription ?? ""
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
