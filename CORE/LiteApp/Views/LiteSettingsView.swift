@@ -12,6 +12,13 @@ struct LiteSettingsView: View {
     @State private var selection = FamilyActivitySelection()
     @State private var showPicker = false
     #endif
+    @State private var tripoKey = KeychainHelper.tripoKey() ?? ""
+    @State private var keySaved = KeychainHelper.tripoKey() != nil
+
+    private func saveKey() {
+        KeychainHelper.saveTripoKey(tripoKey.trimmingCharacters(in: .whitespacesAndNewlines))
+        keySaved = KeychainHelper.tripoKey() != nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -29,6 +36,24 @@ struct LiteSettingsView: View {
                     Text("Today")
                 } footer: {
                     Text("Yesterday's usage becomes Growth Points each morning. Less phone → more growth. Points can never be bought.")
+                }
+
+                Section {
+                    SecureField("Tripo API key (tsk_…)", text: $tripoKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { saveKey() }
+                    if keySaved {
+                        Label("Key saved — \"Bring to life in HD\" is available", systemImage: "checkmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.green)
+                    } else if !tripoKey.isEmpty {
+                        Button("Save key") { saveKey() }
+                    }
+                } header: {
+                    Text("Tripo AI (HD creature generation)")
+                } footer: {
+                    Text("Get a key at platform.tripo3d.ai → API Keys. Stored in the device Keychain, used only to talk to Tripo, and each generation spends credits from your Tripo account. For personal builds only — a public release must proxy this through a server.")
                 }
 
                 Section("Distracting apps") {

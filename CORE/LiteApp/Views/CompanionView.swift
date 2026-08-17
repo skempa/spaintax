@@ -8,6 +8,7 @@ struct CompanionView: View {
     @EnvironmentObject private var app: LiteAppState
     @State private var showFocus = false
     @State private var showSettings = false
+    @State private var showEnhance = false
 
     private var arAvailable: Bool {
         #if targetEnvironment(simulator)
@@ -31,8 +32,19 @@ struct CompanionView: View {
                     startPoint: .top, endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                CreatureSpriteView(creature: creature, size: 200)
-                    .offset(y: 40)
+                if let conceptFile = creature.appearance.conceptImageFile,
+                   let concept = GameStore.shared.loadImage(named: conceptFile) {
+                    Image(uiImage: concept)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 230)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                        .shadow(color: (creature.cores.first?.color ?? .cyan).opacity(0.6), radius: 18)
+                        .offset(y: 40)
+                } else {
+                    CreatureSpriteView(creature: creature, size: 200)
+                        .offset(y: 40)
+                }
             }
 
             VStack {
@@ -44,6 +56,7 @@ struct CompanionView: View {
         }
         .sheet(isPresented: $showFocus) { FocusSessionView() }
         .sheet(isPresented: $showSettings) { LiteSettingsView() }
+        .sheet(isPresented: $showEnhance) { EnhanceSheet() }
         .fullScreenCover(item: $app.celebration) { stage in
             LiteEvolutionView(stage: stage)
         }
@@ -120,6 +133,18 @@ struct CompanionView: View {
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.75))
                 .shadow(radius: 3)
+            if app.hasTripoKey && creature.appearance.tripoModelFile == nil {
+                Button {
+                    showEnhance = true
+                } label: {
+                    Text("✨ Bring to life in HD")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(.white.opacity(0.15), in: Capsule())
+                        .foregroundStyle(.white)
+                }
+            }
             Button {
                 showFocus = true
             } label: {
@@ -169,6 +194,7 @@ struct ARCompanionView: UIViewRepresentable {
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.updateStage(stage, creature: creature)
+        context.coordinator.reloadIfModelChanged(creature: creature, stage: stage)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -177,9 +203,10 @@ struct ARCompanionView: UIViewRepresentable {
     final class Coordinator {
         weak var arView: ARView?
         private var anchor: AnchorEntity?
-        private var creatureEntity: ModelEntity?
+        private var creatureEntity: Entity?
         private var adornments: Entity?
         private var currentStage: EvolutionStage = .origin
+        private var currentModelFile: String?
         private var wanderTimer: Timer?
         private var orbitTimer: Timer?
 
@@ -197,9 +224,24 @@ struct ARCompanionView: UIViewRepresentable {
             self.anchor = anchor
             self.creatureEntity = entity
             currentStage = stage
+            currentModelFile = creature.appearance.tripoModelFile
             addAdornments(for: stage, creature: creature)
             startIdle()
             startWander()
+        }
+
+        /// After HD generation completes, replace the voxel model with the
+        /// Tripo USDZ in place.
+        func reloadIfModelChanged(creature: Creature, stage: EvolutionStage) {
+            guard creature.appearance.tripoModelFile != currentModelFile,
+                  let anchor else { return }
+            currentModelFile = creature.appearance.tripoModelFile
+            creatureEntity?.removeFromParent()
+            adornments = nil
+            let entity = makeCreatureEntity(creature: creature, stage: stage)
+            anchor.addChild(entity)
+            creatureEntity = entity
+            addAdornments(for: stage, creature: creature)
         }
 
         func updateStage(_ stage: EvolutionStage, creature: Creature) {
@@ -222,21 +264,39 @@ struct ARCompanionView: UIViewRepresentable {
             }
         }
 
-        private func makeCreatureEntity(creature: Creature, stage: EvolutionStage) -> ModelEntity {
+        private func makeCreatureEntity(creature: Creature, stage: EvolutionStage) -> Entity {
             let height: Float = 0.30 * Float(creature.appearance.scale)
-            let entity: ModelEntity
-            if let image = GameStore.shared.loadImage(named: creature.appearance.processedImageFile),
-               let grid = VoxelExtractor.fromDrawing(image),
-               let voxel = try? VoxelMeshBuilder.entity(for: grid, targetHeight: height) {
+            let entity: Entity
+
+            // Tripo-generated USDZ takes priority: a polished, ideally
+            // animated model. Falls back to the voxel mesh.
+            if let file = creature.appearance.tripoModelFile,
+               case let url = GameStore.shared.directory.appendingPathComponent(file),
+               FileManager.default.fileExists(atPath: url.path),
+               let loaded = try? Entity.load(contentsOf: url) {
+                // Normalise to the target height, feet on the floor.
+                let bounds = loaded.visualBounds(relativeTo: nil)
+                let extent = max(bounds.extents.y, 0.001)
+                let factor = height / extent
+                loaded.scale *= SIMD3(repeating: factor)
+                loaded.position.y = -bounds.min.y * factor
+                if let animation = loaded.availableAnimations.first {
+                    loaded.playAnimation(animation.repeat(), transitionDuration: 0.3)
+                }
+                entity = loaded
+            } else if let image = GameStore.shared.loadImage(named: creature.appearance.processedImageFile),
+                      let grid = VoxelExtractor.fromDrawing(image),
+                      let voxel = try? VoxelMeshBuilder.entity(for: grid, targetHeight: height) {
                 entity = voxel
             } else {
-                entity = ModelEntity(
+                let fallback = ModelEntity(
                     mesh: .generateBox(size: height * 0.6),
                     materials: [SimpleMaterial(color: .white, isMetallic: false)]
                 )
-                entity.position.y = height * 0.3
+                fallback.position.y = height * 0.3
+                entity = fallback
             }
-            entity.scale *= scaleFactor(for: stage)
+            entity.scale *= SIMD3(repeating: scaleFactor(for: stage))
 
             let shadowMesh = MeshResource.generatePlane(width: height * 0.9, depth: height * 0.6)
             var shadowMaterial = UnlitMaterial()

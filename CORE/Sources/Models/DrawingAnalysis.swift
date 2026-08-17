@@ -44,4 +44,10 @@ struct CreatureAppearance: Codable, Equatable {
     var roundness: Double
     /// Overall scale factor for AR placement, roughly 0.8–1.3.
     var scale: Double
+    /// Tripo concept art derived from the drawing (optional — set once
+    /// the player runs HD generation).
+    var conceptImageFile: String?
+    /// Tripo-generated USDZ model file (optional). When present the AR
+    /// view loads this instead of the voxel mesh.
+    var tripoModelFile: String?
 }

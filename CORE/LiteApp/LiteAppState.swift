@@ -305,6 +305,20 @@ final class LiteAppState: ObservableObject {
         }
     }
 
+    // MARK: - Tripo enhancement
+
+    /// Applies a completed Tripo generation to the creature: the AR view
+    /// switches from the voxel mesh to the generated USDZ model.
+    func applyEnhancement(_ result: TripoCreatureEnhancer.Result) {
+        guard var creature = gameState.creature else { return }
+        creature.appearance.conceptImageFile = result.conceptImageFile ?? creature.appearance.conceptImageFile
+        creature.appearance.tripoModelFile = result.modelFile ?? creature.appearance.tripoModelFile
+        gameState.creature = creature
+        persist()
+    }
+
+    var hasTripoKey: Bool { KeychainHelper.tripoKey() != nil }
+
     // MARK: - Persistence
 
     func persist() { store.save(gameState) }

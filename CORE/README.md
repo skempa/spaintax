@@ -110,6 +110,27 @@ The creature-generation pipeline (drawing → voxel grid → inflated mesh)
 matches the web prototype exactly, so what players see in the browser
 demo is what they get in AR.
 
+## Tripo HD creature generation (CORELite)
+
+CORELite can replace the on-device voxel creature with a Tripo-generated
+model. Pipeline (`TripoCreatureEnhancer`, official v3 API via
+`TripoClient`): drawing → **concept art** (`image-to-image`, prompted
+into a T-pose with limbs separated — Tripo's own auto-rig guidance, so
+skeletons deform cleanly) → **3D model** (`image-to-model`, PBR) →
+**rig-check → rig → preset animations** (idle + walk; best-effort,
+falls back to a static model) → **USDZ export** loaded by RealityKit,
+with the voxel creature as the always-working fallback.
+
+Setup: paste an API key from platform.tripo3d.ai into CORELite's
+Settings (stored in the Keychain), then tap **"Bring to life in HD"**
+on the companion screen. Each run spends Tripo credits from that
+account and takes a few minutes.
+
+**Personal builds only**: shipping an app with user-side API keys is
+not acceptable for distribution — production must route generation
+through a backend service (which is also where drawing moderation and
+caching belong).
+
 ## Screen Time: how it works and what Apple requires
 
 Apple never exposes raw usage totals to apps. CORE therefore:
