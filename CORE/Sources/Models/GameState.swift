@@ -74,12 +74,37 @@ struct LiteProgress: Codable, Equatable {
     var celebratedStage: Int = 1
     /// Active focus session, persisted so a killed app can reconcile.
     var activeFocus: FocusRecord?
+    /// In-flight creature generation, persisted so a suspended or killed
+    /// app can resume polling Tripo instead of losing the run.
+    var spawn: SpawnRecord?
 }
 
 /// A focus session in flight (or being reconciled after relaunch).
 struct FocusRecord: Codable, Equatable {
     var startedAt: Date
     var minutes: Int
+}
+
+/// Everything needed to resume a Tripo generation from where it left off.
+/// Each stage writes its task ID here as soon as the task is created;
+/// on resume, stages with an ID skip creation and go straight to waiting.
+struct SpawnRecord: Codable, Equatable {
+    var startedAt: Date
+    var description: String?
+    var drawingToken: String?
+    var conceptTaskID: String?
+    var conceptImageURL: String?
+    var conceptFile: String?
+    var modelTaskID: String?
+    var rigCheckTaskID: String?
+    var rigType: String?
+    var rigTaskID: String?
+    var retargetTaskID: String?
+    var convertTaskID: String?
+    var animated: Bool = false
+    var notes: [String] = []
+    /// Set when the run died with an error; cleared by a fresh run.
+    var failedMessage: String?
 }
 
 /// One day of real-world behaviour and the resulting reward.

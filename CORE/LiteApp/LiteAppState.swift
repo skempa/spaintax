@@ -51,6 +51,12 @@ final class LiteAppState: ObservableObject {
     let generator: CreatureGenerating
     private let store = GameStore.shared
 
+    /// The creature-generation pipeline. Owned here (not by a view) so a
+    /// run survives screen changes and can be resumed after suspension.
+    let enhancer = TripoCreatureEnhancer()
+    private var enhancerSub: AnyCancellable?
+    private var spawnBackgroundTask: UIBackgroundTaskIdentifier = .invalid
+
     /// Simulator sessions run at 2 s per "minute" so the loop is testable.
     var secondsPerFocusMinute: TimeInterval {
         #if targetEnvironment(simulator)
@@ -86,8 +92,13 @@ final class LiteAppState: ObservableObject {
             Task { @MainActor in self?.lockedWhileBackgrounded = true }
         }
 
+        enhancerSub = enhancer.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+
         reconcileInterruptedFocus()
         refreshDaily()
+        resumeSpawnIfNeeded()
     }
 
     var creature: Creature? { gameState.creature }
@@ -263,12 +274,21 @@ final class LiteAppState: ObservableObject {
     // MARK: App lifecycle during focus
 
     func appDidEnterBackground() {
+        // Buy a little time so an in-flight Tripo poll can finish and the
+        // spawn record is persisted before the app is frozen.
+        if isSpawning {
+            spawnBackgroundTask = UIApplication.shared.beginBackgroundTask { [weak self] in
+                self?.endSpawnBackgroundTask()
+            }
+        }
         guard case .running = focusPhase else { return }
         backgroundedAt = Date()
         lockedWhileBackgrounded = false
     }
 
     func appDidBecomeActive() {
+        endSpawnBackgroundTask()
+        resumeSpawnIfNeeded()
         refreshDaily()
         guard case .running = focusPhase, let left = backgroundedAt else { return }
         backgroundedAt = nil
@@ -340,10 +360,105 @@ final class LiteAppState: ObservableObject {
         }
     }
 
-    /// Player confirmed the description. Moves on to the reveal; once the
-    /// spawn pipeline lands (next increment) this also kicks off generation.
+    /// Player confirmed the description: kick off generation (if a Tripo
+    /// key exists) and move on to the reveal, which shows progress.
     func confirmDescriptionAndContinue() {
+        if hasTripoKey { beginSpawn() }
         screen = .reveal
+    }
+
+    // MARK: - Spawn (Tripo generation, resumable)
+
+    static let spawnNotificationID = "core.spawn.ready"
+
+    var isSpawning: Bool { enhancer.isRunning }
+    var spawnRecord: SpawnRecord? { lite.spawn }
+    var spawnFailedMessage: String? { lite.spawn?.failedMessage }
+
+    /// Starts a fresh generation for the current creature.
+    func beginSpawn() {
+        guard let key = KeychainHelper.tripoKey(), !enhancer.isRunning else { return }
+        var progress = lite
+        progress.spawn = nil
+        gameState.lite = progress
+        enhancer.run(
+            apiKey: key,
+            description: gameState.creature?.creatureDescription,
+            persist: { [weak self] record in self?.storeSpawn(record) },
+            completion: { [weak self] result in self?.finishSpawn(result) }
+        )
+        scheduleSpawnNotification()
+    }
+
+    /// Re-runs from scratch after a failure.
+    func retrySpawn() {
+        var progress = lite
+        progress.spawn = nil
+        gameState.lite = progress
+        persist()
+        beginSpawn()
+    }
+
+    /// Gives up on the current run; the creature stays as blocks.
+    func abandonSpawn() {
+        enhancer.cancel()
+        var progress = lite
+        progress.spawn = nil
+        gameState.lite = progress
+        persist()
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [Self.spawnNotificationID])
+    }
+
+    /// If a run was persisted mid-flight and the enhancer isn't already
+    /// working, pick it up from the last recorded task ID.
+    func resumeSpawnIfNeeded() {
+        guard let record = lite.spawn, record.failedMessage == nil,
+              !enhancer.isRunning,
+              let key = KeychainHelper.tripoKey() else { return }
+        enhancer.resume(
+            record: record,
+            apiKey: key,
+            persist: { [weak self] record in self?.storeSpawn(record) },
+            completion: { [weak self] result in self?.finishSpawn(result) }
+        )
+    }
+
+    private func storeSpawn(_ record: SpawnRecord) {
+        var progress = lite
+        progress.spawn = record
+        gameState.lite = progress
+        persist()
+    }
+
+    private func finishSpawn(_ result: TripoCreatureEnhancer.Result) {
+        applyEnhancement(result)
+        var progress = lite
+        progress.spawn = nil
+        gameState.lite = progress
+        persist()
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [Self.spawnNotificationID])
+    }
+
+    private func scheduleSpawnNotification() {
+        let name = gameState.creature?.name ?? "Your creature"
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            guard granted else { return }
+            let content = UNMutableNotificationContent()
+            content.title = "\(name) is ready"
+            content.body = "Your creature has taken shape. Open CORE to meet it in your room."
+            content.sound = .default
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 240, repeats: false)
+            center.add(UNNotificationRequest(identifier: Self.spawnNotificationID, content: content, trigger: trigger))
+        }
+    }
+
+    private func endSpawnBackgroundTask() {
+        guard spawnBackgroundTask != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(spawnBackgroundTask)
+        spawnBackgroundTask = .invalid
     }
 
     // MARK: - Tripo enhancement
@@ -386,6 +501,7 @@ final class LiteAppState: ObservableObject {
     /// Wipes everything back to first launch so the onboarding + creation
     /// flow can be trialled repeatedly. Optionally forgets the API keys too.
     func resetAll(forgetKeys: Bool) {
+        enhancer.cancel()
         focusTimer?.cancel(); focusTimer = nil
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
 

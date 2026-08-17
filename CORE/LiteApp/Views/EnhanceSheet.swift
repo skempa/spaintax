@@ -5,7 +5,7 @@ import SwiftUI
 struct EnhanceSheet: View {
     @EnvironmentObject private var app: LiteAppState
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var enhancer = TripoCreatureEnhancer()
+    private var enhancer: TripoCreatureEnhancer { app.enhancer }
     @State private var started = false
     @State private var keyInput = ""
     @State private var hasKey = KeychainHelper.tripoKey() != nil
@@ -184,9 +184,7 @@ struct EnhanceSheet: View {
                     guard let key = KeychainHelper.tripoKey() else { return }
                     app.setCreatureDescription(descriptionInput)
                     started = true
-                    enhancer.run(apiKey: key, description: descriptionInput) { result in
-                        app.applyEnhancement(result)
-                    }
+                    app.beginSpawn()
                 } label: {
                     Text(startLabel)
                         .font(.headline)
@@ -202,7 +200,7 @@ struct EnhanceSheet: View {
             }
         default:
             Button("Cancel") {
-                enhancer.cancel()
+                app.abandonSpawn()
                 dismiss()
             }
             .font(.subheadline)

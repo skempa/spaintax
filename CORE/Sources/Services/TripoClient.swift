@@ -162,7 +162,7 @@ final class TripoClient {
         let started = Date()
         while true {
             try Task.checkCancellation()
-            let task = try await getTask(id)
+            let task = try await getTaskWithRetry(id)
             onProgress?(task)
             if task.isTerminal {
                 guard task.status == "success" else { throw TripoError.taskFailed(status: task.status) }
@@ -170,6 +170,33 @@ final class TripoClient {
             }
             if Date().timeIntervalSince(started) > timeout { throw TripoError.timeout }
             try await Task.sleep(nanoseconds: 3_000_000_000)
+        }
+    }
+
+    /// A poll that dies to a transient network error — the app was just
+    /// suspended mid-request, Wi-Fi blipped — must not kill a 10-minute
+    /// generation. Retry those with backoff; everything else propagates.
+    private func getTaskWithRetry(_ id: String, attempts: Int = 5) async throws -> TripoTask {
+        var delay: UInt64 = 3
+        for attempt in 1...attempts {
+            do {
+                return try await getTask(id)
+            } catch let error as URLError where Self.isTransient(error) && attempt < attempts {
+                try await Task.sleep(nanoseconds: delay * 1_000_000_000)
+                delay = min(delay * 2, 30)
+            }
+        }
+        return try await getTask(id)
+    }
+
+    private static func isTransient(_ error: URLError) -> Bool {
+        switch error.code {
+        case .timedOut, .networkConnectionLost, .notConnectedToInternet,
+             .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed,
+             .internationalRoamingOff, .dataNotAllowed:
+            return true
+        default:
+            return false
         }
     }
 
