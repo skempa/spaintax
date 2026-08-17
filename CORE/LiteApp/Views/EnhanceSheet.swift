@@ -84,7 +84,12 @@ struct EnhanceSheet: View {
 
             actionButton
                 .padding(.horizontal, 32)
-                .padding(.bottom, 28)
+                .padding(.bottom, 8)
+
+            Text("Generation pipeline \(TripoCreatureEnhancer.pipelineRevision)")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.3))
+                .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(red: 0.05, green: 0.07, blue: 0.13))

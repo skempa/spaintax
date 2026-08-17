@@ -57,6 +57,10 @@ final class TripoCreatureEnhancer: ObservableObject {
     /// v3.0-20250812, v3.1-20260211.
     static let modelVersion = "v3.1-20260211"
 
+    /// Bumped with every pipeline change; shown in the UI so stale-build
+    /// confusion is impossible.
+    static let pipelineRevision = "r3"
+
     /// The pose-canonicalising interpretation prompt — Tripo's own
     /// rigging guidance baked in: limbs separated, T-pose.
     static let conceptPrompt = """
@@ -90,7 +94,8 @@ final class TripoCreatureEnhancer: ObservableObject {
             } catch is CancellationError {
                 self.stage = .idle
             } catch {
-                self.stage = .failed(error.localizedDescription)
+                // Tag the failure with the stage it died in.
+                self.stage = .failed("Failed during '\(self.stage.label)' — \(error.localizedDescription)")
             }
         }
     }
