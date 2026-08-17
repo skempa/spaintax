@@ -50,4 +50,8 @@ struct CreatureAppearance: Codable, Equatable {
     /// Tripo-generated USDZ model file (optional). When present the AR
     /// view loads this instead of the voxel mesh.
     var tripoModelFile: String?
+    /// Bumped every time the model file is (re)written so the AR view
+    /// reloads even when the file name is unchanged. Optional so older
+    /// saves decode.
+    var tripoModelRevision: Int?
 }

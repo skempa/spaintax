@@ -316,6 +316,9 @@ final class LiteAppState: ObservableObject {
         guard var creature = gameState.creature else { return }
         creature.appearance.conceptImageFile = result.conceptImageFile ?? creature.appearance.conceptImageFile
         creature.appearance.tripoModelFile = result.modelFile ?? creature.appearance.tripoModelFile
+        if result.modelFile != nil {
+            creature.appearance.tripoModelRevision = (creature.appearance.tripoModelRevision ?? 0) + 1
+        }
         gameState.creature = creature
         persist()
     }
