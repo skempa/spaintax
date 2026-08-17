@@ -13,6 +13,8 @@ final class LiteAppState: ObservableObject {
         case onboarding
         case drawing
         case generating
+        /// The AI has looked at the drawing; the player confirms/edits what it is.
+        case describing
         case reveal
         case companion
     }
@@ -21,6 +23,12 @@ final class LiteAppState: ObservableObject {
     @Published var gameState: GameState
     @Published var todayRecord: DailyRecord?
     @Published var generationError: String?
+
+    // MARK: Describe step
+
+    @Published var describeDraft = ""
+    @Published var isDescribing = false
+    @Published var describeError: String?
     /// Set when a points threshold was just crossed — shows the
     /// evolution celebration.
     @Published var celebration: EvolutionStage?
@@ -300,12 +308,42 @@ final class LiteAppState: ObservableObject {
                 gameState.creature = creature
                 gameState.hasCompletedOnboarding = true
                 persist()
-                screen = .reveal
+                describeDraft = ""
+                describeError = nil
+                screen = .describing
             } catch {
                 generationError = "Something went wrong bringing your creature to life. Try again?"
                 screen = .drawing
             }
         }
+    }
+
+    // MARK: - Describe (Claude vision)
+
+    var hasClaudeKey: Bool { KeychainHelper.claudeKey() != nil }
+
+    /// Asks Claude to put the drawing into words and fills the draft the
+    /// player edits. Silent no-op without a key; errors are surfaced for
+    /// the view to show inline.
+    func describeDrawing() async {
+        guard let key = KeychainHelper.claudeKey(),
+              let creature = gameState.creature,
+              let image = store.loadImage(named: creature.appearance.originalDrawingFile) else { return }
+        isDescribing = true
+        describeError = nil
+        defer { isDescribing = false }
+        do {
+            let text = try await ClaudeVisionClient(apiKey: key).describeDrawing(image)
+            if !text.isEmpty { describeDraft = text }
+        } catch {
+            describeError = error.localizedDescription
+        }
+    }
+
+    /// Player confirmed the description. Moves on to the reveal; once the
+    /// spawn pipeline lands (next increment) this also kicks off generation.
+    func confirmDescriptionAndContinue() {
+        screen = .reveal
     }
 
     // MARK: - Tripo enhancement
@@ -361,6 +399,8 @@ final class LiteAppState: ObservableObject {
         celebration = nil
         generationError = nil
         todayRecord = nil
+        describeDraft = ""
+        describeError = nil
 
         if forgetKeys {
             KeychainHelper.saveTripoKey("")

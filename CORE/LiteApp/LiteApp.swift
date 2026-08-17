@@ -34,6 +34,7 @@ struct LiteRootView: View {
             case .onboarding: LiteOnboardingView()
             case .drawing:    LiteDrawingView()
             case .generating: LiteGeneratingView()
+            case .describing: LiteDescribeView()
             case .reveal:     LiteRevealView()
             case .companion:  CompanionView()
             }

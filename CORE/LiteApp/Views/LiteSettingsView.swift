@@ -14,12 +14,19 @@ struct LiteSettingsView: View {
     #endif
     @State private var tripoKey = KeychainHelper.tripoKey() ?? ""
     @State private var keySaved = KeychainHelper.tripoKey() != nil
+    @State private var claudeKey = KeychainHelper.claudeKey() ?? ""
+    @State private var claudeKeySaved = KeychainHelper.claudeKey() != nil
     @State private var descriptionInput = ""
     @State private var showResetDialog = false
 
     private func saveKey() {
         KeychainHelper.saveTripoKey(tripoKey.trimmingCharacters(in: .whitespacesAndNewlines))
         keySaved = KeychainHelper.tripoKey() != nil
+    }
+
+    private func saveClaudeKey() {
+        KeychainHelper.saveClaudeKey(claudeKey.trimmingCharacters(in: .whitespacesAndNewlines))
+        claudeKeySaved = KeychainHelper.claudeKey() != nil
     }
 
     var body: some View {
@@ -56,6 +63,24 @@ struct LiteSettingsView: View {
                     Text("Tripo AI (HD creature generation)")
                 } footer: {
                     Text("Get a key at platform.tripo3d.ai → API Keys. Stored in the device Keychain, used only to talk to Tripo, and each generation spends credits from your Tripo account. For personal builds only — a public release must proxy this through a server.")
+                }
+
+                Section {
+                    SecureField("Claude API key (sk-ant-…)", text: $claudeKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { saveClaudeKey() }
+                    if claudeKeySaved {
+                        Label("Key saved — drawings are described automatically", systemImage: "checkmark.circle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.accent)
+                    } else if !claudeKey.isEmpty {
+                        Button("Save key") { saveClaudeKey() }
+                    }
+                } header: {
+                    Text("Claude AI (describes your drawing)")
+                } footer: {
+                    Text("Get a key at console.anthropic.com. Stored in the device Keychain, used only to look at your drawing and suggest a description you can edit. For personal builds only.")
                 }
 
                 Section("Distracting apps") {
