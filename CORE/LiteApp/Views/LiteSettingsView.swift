@@ -15,6 +15,7 @@ struct LiteSettingsView: View {
     @State private var tripoKey = KeychainHelper.tripoKey() ?? ""
     @State private var keySaved = KeychainHelper.tripoKey() != nil
     @State private var descriptionInput = ""
+    @State private var showResetDialog = false
 
     private func saveKey() {
         KeychainHelper.saveTripoKey(tripoKey.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -113,6 +114,21 @@ struct LiteSettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                Section {
+                    Button("Reset everything", role: .destructive) { showResetDialog = true }
+                } header: {
+                    Text("Testing")
+                } footer: {
+                    Text("Deletes your creature, drawings, HD model and all progress, and returns to onboarding. Your Screen Time app selection is kept.")
+                }
+            }
+            .confirmationDialog("Start over from scratch?", isPresented: $showResetDialog, titleVisibility: .visible) {
+                Button("Reset, keep API keys", role: .destructive) { performReset(forgetKeys: false) }
+                Button("Reset and forget API keys", role: .destructive) { performReset(forgetKeys: true) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This cannot be undone.")
             }
             .scrollContentBackground(.hidden)
             .background(Theme.background.ignoresSafeArea())
@@ -138,6 +154,14 @@ struct LiteSettingsView: View {
             #endif
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func performReset(forgetKeys: Bool) {
+        dismiss()
+        // Let the sheet finish dismissing before the root screen swaps out.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            app.resetAll(forgetKeys: forgetKeys)
+        }
     }
 
     private func minutesLabel(_ minutes: Double) -> String {

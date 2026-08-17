@@ -223,7 +223,8 @@ final class LiteAppState: ObservableObject {
 
     private func finishFocus(completed: Bool) {
         focusTimer?.cancel(); focusTimer = nil
-        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(withIdentifiers: [Self.focusNotificationID])
 
         guard let record = lite.activeFocus else { focusPhase = .idle; return }
         let minutesDone = completed
@@ -279,9 +280,11 @@ final class LiteAppState: ObservableObject {
             content.title = "Focus complete"
             content.body = "\(self.gameState.creature?.name ?? "Your creature") grew from your focus. Come see!"
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(seconds, 1), repeats: false)
-            center.add(UNNotificationRequest(identifier: "core.focus.done", content: content, trigger: trigger))
+            center.add(UNNotificationRequest(identifier: Self.focusNotificationID, content: content, trigger: trigger))
         }
     }
+
+    static let focusNotificationID = "core.focus.done"
 
     // MARK: - Creature creation
 
@@ -335,6 +338,33 @@ final class LiteAppState: ObservableObject {
         creature.appearance.tripoModelFile = nil
         gameState.creature = creature
         persist()
+    }
+
+    // MARK: - Reset (testing)
+
+    /// Wipes everything back to first launch so the onboarding + creation
+    /// flow can be trialled repeatedly. Optionally forgets the API keys too.
+    func resetAll(forgetKeys: Bool) {
+        focusTimer?.cancel(); focusTimer = nil
+        UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+
+        store.wipeAll()
+        var fresh = GameState()
+        fresh.lite = LiteProgress()
+        gameState = fresh
+
+        focusPhase = .idle
+        focusRemaining = 0
+        celebration = nil
+        generationError = nil
+        todayRecord = nil
+
+        if forgetKeys {
+            KeychainHelper.saveTripoKey("")
+            KeychainHelper.saveClaudeKey("")
+        }
+
+        screen = .onboarding
     }
 
     // MARK: - Persistence

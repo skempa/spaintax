@@ -63,4 +63,24 @@ final class GameStore {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return UIImage(data: data)
     }
+
+    // MARK: - Deletion
+
+    func deleteFile(named name: String) {
+        try? fileManager.removeItem(at: directory.appendingPathComponent(name))
+    }
+
+    /// Deletes every regular file we own in the store directory: the game
+    /// state, drawing/concept images and the HD model. Leaves the App Group
+    /// UserDefaults alone (Screen Time selection lives there) and does not
+    /// descend into subdirectories.
+    func wipeAll() {
+        guard let items = try? fileManager.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: [.isRegularFileKey]
+        ) else { return }
+        for url in items {
+            let isFile = (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) ?? false
+            if isFile { try? fileManager.removeItem(at: url) }
+        }
+    }
 }

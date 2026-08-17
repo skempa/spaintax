@@ -1,14 +1,27 @@
 import Foundation
 import Security
 
-/// Minimal Keychain wrapper for the Tripo API key. Never store API keys
+/// Minimal Keychain wrapper for third-party API keys. Never store API keys
 /// in UserDefaults or source control.
 enum KeychainHelper {
-    private static let service = "app.core.tripo"
     private static let account = "api-key"
+    private static let tripoService  = "app.core.tripo"
+    private static let claudeService = "app.core.claude"
 
-    static func saveTripoKey(_ key: String) {
-        let data = Data(key.utf8)
+    // MARK: Tripo
+
+    static func saveTripoKey(_ key: String) { save(key, service: tripoService) }
+    static func tripoKey() -> String? { read(service: tripoService) }
+
+    // MARK: Claude
+
+    static func saveClaudeKey(_ key: String) { save(key, service: claudeService) }
+    static func claudeKey() -> String? { read(service: claudeService) }
+
+    // MARK: Generic
+
+    /// Saving an empty string deletes the entry.
+    static func save(_ key: String, service: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -17,11 +30,11 @@ enum KeychainHelper {
         SecItemDelete(query as CFDictionary)
         guard !key.isEmpty else { return }
         var insert = query
-        insert[kSecValueData as String] = data
+        insert[kSecValueData as String] = Data(key.utf8)
         SecItemAdd(insert as CFDictionary, nil)
     }
 
-    static func tripoKey() -> String? {
+    static func read(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
