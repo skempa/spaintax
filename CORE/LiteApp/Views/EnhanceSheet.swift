@@ -7,6 +7,8 @@ struct EnhanceSheet: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var enhancer = TripoCreatureEnhancer()
     @State private var started = false
+    @State private var keyInput = ""
+    @State private var hasKey = KeychainHelper.tripoKey() != nil
 
     private let stages: [(TripoCreatureEnhancer.Stage, String)] = [
         (.uploading,  "Upload your drawing"),
@@ -124,7 +126,26 @@ struct EnhanceSheet: View {
             }
         case .idle, .failed:
             VStack(spacing: 10) {
+                if !hasKey {
+                    // First run: collect the Tripo key right here.
+                    SecureField("Tripo API key (tsk_…)", text: $keyInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(12)
+                        .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                    Text("From platform.tripo3d.ai → API Keys. Stored only in this device's Keychain.")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                }
                 Button {
+                    if !hasKey {
+                        let trimmed = keyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { return }
+                        KeychainHelper.saveTripoKey(trimmed)
+                        hasKey = KeychainHelper.tripoKey() != nil
+                        guard hasKey else { return }
+                    }
                     guard let key = KeychainHelper.tripoKey() else { return }
                     started = true
                     enhancer.run(apiKey: key) { result in
@@ -135,9 +156,10 @@ struct EnhanceSheet: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.white, in: Capsule())
+                        .background(canStart ? Color.white : Color.gray.opacity(0.4), in: Capsule())
                         .foregroundStyle(.black)
                 }
+                .disabled(!canStart)
                 Button("Not now") { dismiss() }
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.5))
@@ -154,6 +176,10 @@ struct EnhanceSheet: View {
 
     private var startLabel: String {
         if case .failed = enhancer.stage { return "Try again" }
-        return "✨ Start generation"
+        return hasKey ? "✨ Start generation" : "Save key & start"
+    }
+
+    private var canStart: Bool {
+        hasKey || !keyInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

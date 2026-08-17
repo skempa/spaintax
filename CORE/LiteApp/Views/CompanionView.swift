@@ -133,7 +133,7 @@ struct CompanionView: View {
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.75))
                 .shadow(radius: 3)
-            if app.hasTripoKey && creature.appearance.tripoModelFile == nil {
+            if creature.appearance.tripoModelFile == nil {
                 Button {
                     showEnhance = true
                 } label: {

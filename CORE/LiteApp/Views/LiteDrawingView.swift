@@ -13,6 +13,7 @@ struct LiteDrawingView: View {
     @State private var showNamePrompt = false
     @State private var creatureName = ""
     @State private var hasInk = false
+    @State private var showSettings = false
 
     private let palette: [Color] = [
         .white, .red, .orange, .yellow, .green, .mint, .cyan, .blue, .purple, .pink, .brown
@@ -20,10 +21,19 @@ struct LiteDrawingView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("Draw your companion")
-                .font(.title2.bold())
-                .foregroundStyle(.white)
-                .padding(.top, 16)
+            HStack {
+                Spacer()
+                Text("Draw your companion")
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                Spacer()
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
             Text("A blob with legs is perfect. Fill it with colour for a richer creature.")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.6))
@@ -100,5 +110,6 @@ struct LiteDrawingView: View {
         } message: {
             Text(app.generationError ?? "")
         }
+        .sheet(isPresented: $showSettings) { LiteSettingsView() }
     }
 }
