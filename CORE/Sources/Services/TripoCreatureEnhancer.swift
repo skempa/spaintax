@@ -48,6 +48,14 @@ final class TripoCreatureEnhancer: ObservableObject {
 
     @Published private(set) var stage: Stage = .idle
     @Published private(set) var conceptImage: UIImage?
+    /// Non-fatal stage skips (concept art, animation) — surfaced in the
+    /// UI so failures are diagnosable instead of silent.
+    @Published private(set) var notes: [String] = []
+
+    /// The API requires an explicit model version even though the SDK
+    /// marks it optional. Allowed (Aug 2026): P1-20260311, v2.5-20250123,
+    /// v3.0-20250812, v3.1-20260211.
+    static let modelVersion = "v3.1-20260211"
 
     /// The pose-canonicalising interpretation prompt — Tripo's own
     /// rigging guidance baked in: limbs separated, T-pose.
@@ -122,12 +130,14 @@ final class TripoCreatureEnhancer: ObservableObject {
         } catch {
             // Concept stage is an enhancer, not a gate: fall back to the
             // raw drawing as the 3D input.
+            notes.append("Concept art skipped: \(error.localizedDescription)")
         }
 
         // 3. The 3D model itself.
         stage = .modeling
         let modelTaskID = try await client.createTask("generation/image-to-model", body: [
             "file": modelInput,
+            "model": Self.modelVersion,
             "texture": true,
             "pbr": true,
         ])
@@ -164,6 +174,7 @@ final class TripoCreatureEnhancer: ObservableObject {
             throw CancellationError()
         } catch {
             // Static model still ships.
+            notes.append("Animation skipped: \(error.localizedDescription)")
             exportInput = modelTaskID
             animated = false
         }

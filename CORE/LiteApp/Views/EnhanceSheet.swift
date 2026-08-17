@@ -68,6 +68,18 @@ struct EnhanceSheet: View {
                     .padding(.horizontal, 24)
             }
 
+            if !enhancer.notes.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(enhancer.notes, id: \.self) { note in
+                        Text(note)
+                            .font(.caption2)
+                            .foregroundStyle(.orange.opacity(0.85))
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(.horizontal, 24)
+            }
+
             Spacer()
 
             actionButton
