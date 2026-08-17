@@ -112,8 +112,13 @@ enum VoxelExtractor {
         frontier = []
         for idx in 0..<(n * n) where solid[idx] {
             let x = idx % n, y = idx / n
-            let isEdge = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)].contains { (nx, ny) in
-                nx < 0 || ny < 0 || nx >= n || ny >= n || !solid[ny * n + nx]
+            let neighbours: [(Int, Int)] = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+            var isEdge = false
+            for (nx, ny) in neighbours {
+                if nx < 0 || ny < 0 || nx >= n || ny >= n || !solid[ny * n + nx] {
+                    isEdge = true
+                    break
+                }
             }
             if isEdge { frontier.append(idx); edgeSeen[idx] = true; dist[idx] = 1 }
         }

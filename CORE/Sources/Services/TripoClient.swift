@@ -38,6 +38,8 @@ final class TripoClient {
         var modelUrls: [String]?
         var image: String?
         var imageUrl: String?
+        /// image-to-image tasks return their result in this field.
+        var generatedImageUrl: String?
         var images: [String]?
         var rigType: String?
         var recommendedRigType: String?
@@ -47,7 +49,7 @@ final class TripoClient {
             modelUrl ?? model ?? pbrModel ?? baseModel ?? modelUrls?.first
         }
         var primaryImageURL: String? {
-            image ?? imageUrl ?? images?.first
+            image ?? imageUrl ?? generatedImageUrl ?? images?.first
         }
     }
 

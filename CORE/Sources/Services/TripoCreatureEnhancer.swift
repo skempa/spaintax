@@ -57,9 +57,14 @@ final class TripoCreatureEnhancer: ObservableObject {
     /// v3.0-20250812, v3.1-20260211.
     static let modelVersion = "v3.1-20260211"
 
+    /// Rig/retarget use their own model line; the server default is a
+    /// de-listed version, so it must be sent explicitly.
+    /// Allowed (Aug 2026): v1.0-20240301, v2.5-20260210.
+    static let rigModelVersion = "v2.5-20260210"
+
     /// Bumped with every pipeline change; shown in the UI so stale-build
     /// confusion is impossible.
-    static let pipelineRevision = "r5"
+    static let pipelineRevision = "r7"
 
     /// Concept prompt = [player's creature description] + hardcoded
     /// style scaffold + hardcoded rig-friendly pose block (always last —
@@ -139,6 +144,8 @@ final class TripoCreatureEnhancer: ObservableObject {
                     conceptFile = "creature-concept.png"
                 }
                 modelInput = ["url": imageURL]
+            } else {
+                notes.append("Concept art returned no image — modeling from the raw drawing.")
             }
         } catch is CancellationError {
             throw CancellationError()
@@ -155,6 +162,10 @@ final class TripoCreatureEnhancer: ObservableObject {
             "model": Self.modelVersion,
             "texture": true,
             "pbr": true,
+            // Without a face limit Tripo returns ~1.4M triangles — enough
+            // to hang RealityKit on older phones. 60k renders identically
+            // at creature size (the normal map carries the detail).
+            "face_limit": 60_000,
         ])
         let modelTask = try await client.waitForTask(modelTaskID, timeout: 900)
         var exportInput = modelTaskID
@@ -171,16 +182,30 @@ final class TripoCreatureEnhancer: ObservableObject {
                     "input": modelTaskID,
                     "rig_type": rigType,
                     "spec": "tripo",
+                    "model": Self.rigModelVersion,
                 ])
                 _ = try await client.waitForTask(rigID, timeout: 600)
 
                 stage = .animating
-                let walkPreset = rigType == "biped" ? "preset:walk" : "preset:\(rigType):walk"
-                let retargetID = try await client.createTask("animations/retarget", body: [
-                    "input": rigID,
-                    "animations": ["preset:idle", walkPreset],
-                    "export_with_geometry": true,
-                ])
+                // Preset naming differs across rig versions: some accept
+                // "preset:idle", others require "preset:<rigType>:idle".
+                // Try plain first, fall back to namespaced.
+                let retargetID: String
+                do {
+                    retargetID = try await client.createTask("animations/retarget", body: [
+                        "input": rigID,
+                        "animations": ["preset:idle", "preset:walk"],
+                        "export_with_geometry": true,
+                        "model": Self.rigModelVersion,
+                    ])
+                } catch {
+                    retargetID = try await client.createTask("animations/retarget", body: [
+                        "input": rigID,
+                        "animations": ["preset:\(rigType):idle", "preset:\(rigType):walk"],
+                        "export_with_geometry": true,
+                        "model": Self.rigModelVersion,
+                    ])
+                }
                 _ = try await client.waitForTask(retargetID, timeout: 600)
                 exportInput = retargetID
                 animated = true
