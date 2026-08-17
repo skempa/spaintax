@@ -25,18 +25,18 @@ struct LiteDrawingView: View {
                 Spacer()
                 Text("Draw your companion")
                     .font(.title2.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.text)
                 Spacer()
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape.fill")
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundStyle(Theme.textFaint)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
             Text("A blob with legs is perfect. Fill it with colour for a richer creature.")
                 .font(.footnote)
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(Theme.textDim)
 
             GeometryReader { geo in
                 CanvasRepresentable(
@@ -45,7 +45,7 @@ struct LiteDrawingView: View {
                     width: strokeWidth,
                     onDrawingChanged: { hasInk = !canvasView.drawing.strokes.isEmpty }
                 )
-                .background(Color(white: 0.12))
+                .background(Theme.canvas)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .onAppear { canvasSize = geo.size }
                 .onChange(of: geo.size) { _, newSize in canvasSize = newSize }
@@ -59,7 +59,7 @@ struct LiteDrawingView: View {
                         Circle()
                             .fill(color)
                             .frame(width: 30, height: 30)
-                            .overlay(Circle().stroke(.white, lineWidth: selectedColor == color ? 3 : 0))
+                            .overlay(Circle().stroke(Theme.accent, lineWidth: selectedColor == color ? 3 : 0))
                             .onTapGesture { selectedColor = color }
                     }
                 }
@@ -70,23 +70,19 @@ struct LiteDrawingView: View {
             HStack(spacing: 20) {
                 Slider(value: $strokeWidth, in: 3...26)
                     .frame(width: 140)
-                    .tint(.white.opacity(0.7))
+                    .tint(Theme.accent)
                 Button("Undo") { canvasView.undoManager?.undo() }
                 Button("Clear") { canvasView.drawing = PKDrawing(); hasInk = false }
             }
             .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.8))
+            .foregroundStyle(Theme.textDim)
 
             Button {
                 showNamePrompt = true
             } label: {
                 Text("Bring it to life")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(hasInk ? Color.white : Color.gray.opacity(0.4), in: Capsule())
-                    .foregroundStyle(.black)
             }
+            .buttonStyle(.primary)
             .disabled(!hasInk)
             .padding(.horizontal, 32)
             .padding(.bottom, 24)

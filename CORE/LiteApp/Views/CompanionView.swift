@@ -31,11 +31,8 @@ struct CompanionView: View {
                 .ignoresSafeArea()
             } else {
                 // Simulator / no-AR fallback: a quiet 2D home.
-                LinearGradient(
-                    colors: [Color(red: 0.05, green: 0.08, blue: 0.15), Color(red: 0.02, green: 0.10, blue: 0.06)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .ignoresSafeArea()
+                Theme.background
+                    .ignoresSafeArea()
                 // Without AR, still show the best available version:
                 // HD model (interactive 3D) → concept art → drawing sprite.
                 if let modelFile = creature.appearance.tripoModelFile,
@@ -88,13 +85,13 @@ struct CompanionView: View {
                         .font(.title2.bold())
                     Text("\(app.stage.displayName) · \(app.lite.growthPoints) Growth Points")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.65))
+                        .foregroundStyle(Theme.textDim)
                 }
                 Spacer()
                 ConditionBadge(condition: creature.condition)
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape.fill")
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Theme.textDim)
                 }
             }
 
@@ -103,7 +100,7 @@ struct CompanionView: View {
                 VStack(spacing: 4) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(.white.opacity(0.15))
+                            Capsule().fill(Theme.surface)
                             Capsule()
                                 .fill(creature.cores.first?.color ?? .cyan)
                                 .frame(width: geo.size.width * app.evolutionProgress)
@@ -112,12 +109,12 @@ struct CompanionView: View {
                     .frame(height: 10)
                     Text("\(next - app.lite.growthPoints) points to evolution")
                         .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.55))
+                        .foregroundStyle(Theme.textFaint)
                 }
             } else {
                 Text("✨ Fully evolved — keep the streak alive")
                     .font(.caption)
-                    .foregroundStyle(.yellow.opacity(0.85))
+                    .foregroundStyle(Theme.accent)
             }
 
             HStack(spacing: 14) {
@@ -128,8 +125,8 @@ struct CompanionView: View {
             }
         }
         .padding(16)
-        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 20))
-        .foregroundStyle(.white)
+        .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 20))
+        .foregroundStyle(Theme.text)
     }
 
     /// HD model failed to display: say why, and offer a way back.
@@ -139,7 +136,7 @@ struct CompanionView: View {
                 .font(.footnote.weight(.semibold))
             Text(message)
                 .font(.caption2)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Theme.textDim)
                 .multilineTextAlignment(.center)
             HStack(spacing: 12) {
                 Button("Keep blocks") { hdError = nil }
@@ -149,12 +146,12 @@ struct CompanionView: View {
                     hdError = nil
                 }
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.mint)
+                .foregroundStyle(Theme.accent)
             }
         }
         .padding(12)
-        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 14))
-        .foregroundStyle(.white)
+        .background(Theme.surfaceRaised, in: RoundedRectangle(cornerRadius: 14))
+        .foregroundStyle(Theme.text)
         .padding(.top, 6)
     }
 
@@ -163,7 +160,7 @@ struct CompanionView: View {
             Text(symbol).font(.caption)
             Text(text).font(.caption.weight(.medium))
         }
-        .foregroundStyle(.white.opacity(0.8))
+        .foregroundStyle(Theme.textDim)
     }
 
     // MARK: - Controls
@@ -172,7 +169,7 @@ struct CompanionView: View {
         VStack(spacing: 10) {
             Text(creature.condition.campMessage(name: creature.name, improving: app.isImproving))
                 .font(.footnote)
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Theme.text)
                 .shadow(radius: 3)
             if creature.appearance.tripoModelFile == nil {
                 Button {
@@ -182,8 +179,8 @@ struct CompanionView: View {
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(.white.opacity(0.15), in: Capsule())
-                        .foregroundStyle(.white)
+                        .background(Theme.surfaceRaised, in: Capsule())
+                        .foregroundStyle(Theme.text)
                 }
             }
             Button {
@@ -193,11 +190,8 @@ struct CompanionView: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        LinearGradient(colors: [.mint, .green], startPoint: .leading, endPoint: .trailing),
-                        in: Capsule()
-                    )
-                    .foregroundStyle(.black)
+                    .background(Theme.accent, in: Capsule())
+                    .foregroundStyle(Theme.onAccent)
             }
         }
     }

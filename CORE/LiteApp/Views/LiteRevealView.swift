@@ -18,7 +18,7 @@ struct LiteRevealView: View {
                     VStack(spacing: 16) {
                         Text("You drew this…")
                             .font(.title3)
-                            .foregroundStyle(.white.opacity(0.7))
+                            .foregroundStyle(Theme.textDim)
                         Image(uiImage: original)
                             .resizable()
                             .scaledToFit()
@@ -30,19 +30,19 @@ struct LiteRevealView: View {
                     CreatureSpriteView(creature: creature, size: 210)
                     Text(creature.name)
                         .font(.largeTitle.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Theme.text)
                     VStack(spacing: 6) {
                         Text("\(core.symbol) \(core.displayName) Core")
                             .font(.title2.weight(.semibold))
                             .foregroundStyle(core.color)
                         Text(core.identity)
                             .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(Theme.textDim)
                     }
                     if !creature.analysis.impressions.isEmpty {
                         Text("The Core chose it for its " + creature.analysis.impressions.joined(separator: ", ") + ".")
                             .font(.footnote.italic())
-                            .foregroundStyle(.white.opacity(0.45))
+                            .foregroundStyle(Theme.textFaint)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
                     }
@@ -57,12 +57,8 @@ struct LiteRevealView: View {
                     app.screen = .companion
                 } label: {
                     Text("Meet it in your room")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.white, in: Capsule())
-                        .foregroundStyle(.black)
                 }
+                .buttonStyle(.primary)
                 .padding(.horizontal, 32)
                 .padding(.bottom, 40)
             }

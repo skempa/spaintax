@@ -110,7 +110,7 @@ struct EnhanceSheet: View {
                 .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0.05, green: 0.07, blue: 0.13))
+        .background(Theme.bgTop)
         .foregroundStyle(.white)
         .interactiveDismissDisabled(isRunning)
         .animation(.easeInOut, value: enhancer.stage)

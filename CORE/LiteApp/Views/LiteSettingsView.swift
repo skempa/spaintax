@@ -47,7 +47,7 @@ struct LiteSettingsView: View {
                     if keySaved {
                         Label("Key saved — \"Bring to life in HD\" is available", systemImage: "checkmark.circle.fill")
                             .font(.footnote)
-                            .foregroundStyle(.green)
+                            .foregroundStyle(Theme.accent)
                     } else if !tripoKey.isEmpty {
                         Button("Save key") { saveKey() }
                     }
@@ -114,6 +114,9 @@ struct LiteSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationTitle("Settings")
             .onAppear {
                 if descriptionInput.isEmpty {

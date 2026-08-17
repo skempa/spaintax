@@ -12,7 +12,7 @@ struct LiteEvolutionView: View {
         let color = creature.cores.first?.color ?? .cyan
 
         return AnyView(ZStack {
-            RadialGradient(colors: [color.opacity(0.35), .black],
+            RadialGradient(colors: [color.opacity(0.35), Theme.bgTop],
                            center: .center, startRadius: 0, endRadius: 500)
                 .ignoresSafeArea()
 
@@ -24,13 +24,13 @@ struct LiteEvolutionView: View {
                     VStack(spacing: 10) {
                         Text("\(creature.name) has evolved!")
                             .font(.largeTitle.bold())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Theme.text)
                         Text("Stage \(stage.rawValue) — \(stage.displayName)")
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(color)
                         Text("Grown from \(app.lite.growthPoints) Growth Points of real-world focus.")
                             .font(.footnote)
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(Theme.textDim)
                     }
                     .transition(.opacity)
                 }
@@ -40,12 +40,8 @@ struct LiteEvolutionView: View {
                         app.celebration = nil
                     } label: {
                         Text("Continue")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.white, in: Capsule())
-                            .foregroundStyle(.black)
                     }
+                    .buttonStyle(.primary)
                     .padding(.horizontal, 32)
                     .padding(.bottom, 40)
                 }

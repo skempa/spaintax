@@ -29,7 +29,7 @@ struct LiteRootView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
             switch app.screen {
             case .onboarding: LiteOnboardingView()
             case .drawing:    LiteDrawingView()
@@ -38,6 +38,7 @@ struct LiteRootView: View {
             case .companion:  CompanionView()
             }
         }
+        .foregroundStyle(Theme.text)
         .animation(.easeInOut(duration: 0.4), value: app.screen)
     }
 }
@@ -54,10 +55,10 @@ struct LiteGeneratingView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            ProgressView().scaleEffect(1.6).tint(.white)
+            ProgressView().scaleEffect(1.6).tint(Theme.accent)
             Text(messages[index])
                 .font(.title3.weight(.medium))
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundStyle(Theme.textDim)
                 .id(index)
         }
         .onReceive(Timer.publish(every: 1.4, on: .main, in: .common).autoconnect()) { _ in

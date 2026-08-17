@@ -21,8 +21,8 @@ struct FocusSessionView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0.04, green: 0.09, blue: 0.07))
-        .foregroundStyle(.white)
+        .background(Theme.background)
+        .foregroundStyle(Theme.text)
         .interactiveDismissDisabled(isRunning)
     }
 
@@ -40,7 +40,7 @@ struct FocusSessionView: View {
                 .padding(.top, 20)
             Text("Put the phone down — lock it, flip it over, walk away. \(app.creature?.name ?? "Your creature") grows while you focus.\n\n1 Growth Point per \(Tuning.focusMinutesPerPoint) minutes.")
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundStyle(Theme.textDim)
                 .multilineTextAlignment(.center)
 
             ForEach(Tuning.focusSessionLengths, id: \.self) { minutes in
@@ -53,17 +53,17 @@ struct FocusSessionView: View {
                         Spacer()
                         Text("+\(minutes / Tuning.focusMinutesPerPoint) pts")
                             .font(.subheadline)
-                            .foregroundStyle(.mint)
+                            .foregroundStyle(Theme.accent)
                     }
                     .padding()
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
                 }
                 .buttonStyle(.plain)
             }
 
             Spacer()
             Button("Not now") { dismiss() }
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Theme.textFaint)
                 .padding(.bottom, 16)
         }
     }
@@ -75,10 +75,10 @@ struct FocusSessionView: View {
             Spacer()
             ZStack {
                 Circle()
-                    .stroke(.white.opacity(0.1), lineWidth: 10)
+                    .stroke(Theme.surface, lineWidth: 10)
                 Circle()
                     .trim(from: 0, to: progressFraction)
-                    .stroke(.mint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                    .stroke(Theme.accent, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 VStack(spacing: 6) {
                     Text(timeString)
@@ -86,7 +86,7 @@ struct FocusSessionView: View {
                         .monospacedDigit()
                     Text("\(app.creature?.name ?? "It") is growing…")
                         .font(.footnote)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Theme.textDim)
                 }
             }
             .frame(width: 240, height: 240)
@@ -94,7 +94,7 @@ struct FocusSessionView: View {
 
             Text("Lock the phone — the session keeps running.\nSwitching to other apps ends it.")
                 .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(Theme.textFaint)
                 .multilineTextAlignment(.center)
 
             Spacer()
@@ -103,7 +103,7 @@ struct FocusSessionView: View {
                 app.abandonFocus()
             }
             .font(.subheadline)
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(Theme.textFaint)
             .padding(.bottom, 16)
         }
     }
@@ -133,7 +133,7 @@ struct FocusSessionView: View {
                  ? "+\(points) Growth Points for \(app.creature?.name ?? "your creature")"
                  : "No points this time — even a few focused minutes count next time.")
                 .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(Theme.textDim)
                 .multilineTextAlignment(.center)
             Spacer()
             Button {
@@ -141,12 +141,8 @@ struct FocusSessionView: View {
                 dismiss()
             } label: {
                 Text("Done")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.white, in: Capsule())
-                    .foregroundStyle(.black)
             }
+            .buttonStyle(.primary)
             .padding(.bottom, 16)
         }
     }
