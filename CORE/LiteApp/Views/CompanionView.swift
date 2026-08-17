@@ -9,6 +9,7 @@ struct CompanionView: View {
     @State private var showFocus = false
     @State private var showSettings = false
     @State private var showEnhance = false
+    @State private var hdError: String?
 
     private var arAvailable: Bool {
         #if targetEnvironment(simulator)
@@ -23,8 +24,10 @@ struct CompanionView: View {
 
         return AnyView(ZStack {
             if arAvailable {
-                ARCompanionView(creature: creature, stage: app.stage)
-                    .ignoresSafeArea()
+                ARCompanionView(creature: creature, stage: app.stage, onHDError: { message in
+                    hdError = message
+                })
+                .ignoresSafeArea()
             } else {
                 // Simulator / no-AR fallback: a quiet 2D home.
                 LinearGradient(
@@ -49,6 +52,9 @@ struct CompanionView: View {
 
             VStack {
                 statusCard(creature)
+                if let hdError {
+                    hdErrorBanner(hdError)
+                }
                 Spacer()
                 bottomControls(creature)
             }
@@ -117,6 +123,32 @@ struct CompanionView: View {
         .foregroundStyle(.white)
     }
 
+    /// HD model failed to display: say why, and offer a way back.
+    private func hdErrorBanner(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            Text("HD model couldn't be displayed")
+                .font(.footnote.weight(.semibold))
+            Text(message)
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+            HStack(spacing: 12) {
+                Button("Keep blocks") { hdError = nil }
+                    .font(.caption.weight(.semibold))
+                Button("Retry generation") {
+                    app.discardHDModel()
+                    hdError = nil
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.mint)
+            }
+        }
+        .padding(12)
+        .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 14))
+        .foregroundStyle(.white)
+        .padding(.top, 6)
+    }
+
     private func statChip(_ symbol: String, _ text: String) -> some View {
         HStack(spacing: 4) {
             Text(symbol).font(.caption)
@@ -173,6 +205,7 @@ extension EvolutionStage: Identifiable {
 struct ARCompanionView: UIViewRepresentable {
     let creature: Creature
     let stage: EvolutionStage
+    var onHDError: (String) -> Void = { _ in }
 
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
@@ -188,6 +221,7 @@ struct ARCompanionView: UIViewRepresentable {
         arView.addSubview(coaching)
 
         context.coordinator.arView = arView
+        context.coordinator.onHDError = onHDError
         context.coordinator.place(creature: creature, stage: stage)
         return arView
     }
@@ -202,6 +236,7 @@ struct ARCompanionView: UIViewRepresentable {
     @MainActor
     final class Coordinator {
         weak var arView: ARView?
+        var onHDError: (String) -> Void = { _ in }
         private var anchor: AnchorEntity?
         private var creatureEntity: Entity?
         private var adornments: Entity?
@@ -269,21 +304,36 @@ struct ARCompanionView: UIViewRepresentable {
             let entity: Entity
 
             // Tripo-generated USDZ takes priority: a polished, ideally
-            // animated model. Falls back to the voxel mesh.
-            if let file = creature.appearance.tripoModelFile,
-               case let url = GameStore.shared.directory.appendingPathComponent(file),
-               FileManager.default.fileExists(atPath: url.path),
-               let loaded = try? Entity.load(contentsOf: url) {
-                // Normalise to the target height, feet on the floor.
-                let bounds = loaded.visualBounds(relativeTo: nil)
-                let extent = max(bounds.extents.y, 0.001)
-                let factor = height / extent
-                loaded.scale *= SIMD3(repeating: factor)
-                loaded.position.y = -bounds.min.y * factor
-                if let animation = loaded.availableAnimations.first {
-                    loaded.playAnimation(animation.repeat(), transitionDuration: 0.3)
+            // animated model. Falls back to the voxel mesh, but never
+            // silently — load failures surface through onHDError.
+            var hdEntity: Entity?
+            if let file = creature.appearance.tripoModelFile {
+                let url = GameStore.shared.directory.appendingPathComponent(file)
+                if !FileManager.default.fileExists(atPath: url.path) {
+                    onHDError("Model file is missing (\(file)).")
+                } else {
+                    do {
+                        let loaded = try Entity.load(contentsOf: url)
+                        // Normalise to the target height, feet on the floor.
+                        let bounds = loaded.visualBounds(relativeTo: nil)
+                        let extent = max(bounds.extents.y, 0.001)
+                        let factor = height / extent
+                        loaded.scale *= SIMD3(repeating: factor)
+                        loaded.position.y = -bounds.min.y * factor
+                        if let animation = loaded.availableAnimations.first {
+                            loaded.playAnimation(animation.repeat(), transitionDuration: 0.3)
+                        }
+                        hdEntity = loaded
+                    } catch {
+                        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                        let bytes = (attrs?[.size] as? Int) ?? 0
+                        onHDError("\(error.localizedDescription) (file: \(bytes / 1024) KB)")
+                    }
                 }
-                entity = loaded
+            }
+
+            if let hdEntity {
+                entity = hdEntity
             } else if let image = GameStore.shared.loadImage(named: creature.appearance.processedImageFile),
                       let grid = VoxelExtractor.fromDrawing(image),
                       let voxel = try? VoxelMeshBuilder.entity(for: grid, targetHeight: height) {

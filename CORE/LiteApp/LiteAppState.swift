@@ -319,6 +319,15 @@ final class LiteAppState: ObservableObject {
 
     var hasTripoKey: Bool { KeychainHelper.tripoKey() != nil }
 
+    /// Drops a broken HD model so generation can be retried; keeps the
+    /// concept art.
+    func discardHDModel() {
+        guard var creature = gameState.creature else { return }
+        creature.appearance.tripoModelFile = nil
+        gameState.creature = creature
+        persist()
+    }
+
     // MARK: - Persistence
 
     func persist() { store.save(gameState) }

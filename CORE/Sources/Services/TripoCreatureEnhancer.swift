@@ -59,7 +59,7 @@ final class TripoCreatureEnhancer: ObservableObject {
 
     /// Bumped with every pipeline change; shown in the UI so stale-build
     /// confusion is impossible.
-    static let pipelineRevision = "r3"
+    static let pipelineRevision = "r4"
 
     /// The pose-canonicalising interpretation prompt — Tripo's own
     /// rigging guidance baked in: limbs separated, T-pose.
@@ -202,6 +202,11 @@ final class TripoCreatureEnhancer: ObservableObject {
             throw TripoClient.TripoError.badResponse
         }
         let modelData = try await client.download(modelURL)
+        // Sanity check: a USDZ is a zip and must start with "PK".
+        guard modelData.count > 4, modelData[0] == 0x50, modelData[1] == 0x4B else {
+            notes.append("Downloaded model wasn't a valid USDZ (\(modelData.count) bytes) — URL may have expired.")
+            throw TripoClient.TripoError.badResponse
+        }
         try modelData.write(to: GameStore.shared.directory.appendingPathComponent("creature-tripo.usdz"), options: .atomic)
 
         return Result(conceptImageFile: conceptFile, modelFile: "creature-tripo.usdz", animated: animated)

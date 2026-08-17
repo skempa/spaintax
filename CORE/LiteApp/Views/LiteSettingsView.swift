@@ -71,6 +71,18 @@ struct LiteSettingsView: View {
                 }
                 #endif
 
+                if let diag = hdModelDiagnostics() {
+                    Section {
+                        LabeledContent("File", value: diag.name)
+                        LabeledContent("Size", value: diag.size)
+                        LabeledContent("First zip entry", value: diag.firstEntry)
+                    } header: {
+                        Text("HD model file (debug)")
+                    } footer: {
+                        Text("A real USDZ starts with a .usdc/.usda entry. An entry ending in .usdz means Tripo wrapped the model in an outer zip; 'not a zip' means the download saved something else entirely.")
+                    }
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: "Lite 0.1 (MVP)")
                     Text("Put the phone down. Your creature is growing.")
@@ -99,6 +111,32 @@ struct LiteSettingsView: View {
     private func minutesLabel(_ minutes: Double) -> String {
         let m = Int(minutes)
         return m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m)m"
+    }
+
+    /// Inspects the downloaded HD model so display failures are
+    /// diagnosable: size + the first zip entry name (a USDZ is a zip whose
+    /// local-file-header filename starts at byte 30).
+    private func hdModelDiagnostics() -> (name: String, size: String, firstEntry: String)? {
+        guard let file = app.creature?.appearance.tripoModelFile else { return nil }
+        let url = GameStore.shared.directory.appendingPathComponent(file)
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else {
+            return (file, "unreadable", "—")
+        }
+        let sizeLabel = data.count >= 1_048_576
+            ? String(format: "%.1f MB", Double(data.count) / 1_048_576)
+            : "\(data.count / 1024) KB"
+
+        var entry = "not a zip"
+        if data.count > 34, data[0] == 0x50, data[1] == 0x4B {   // "PK"
+            let nameLength = Int(data[26]) | (Int(data[27]) << 8)
+            if nameLength > 0, data.count >= 30 + nameLength,
+               let name = String(data: data.subdata(in: 30..<(30 + nameLength)), encoding: .utf8) {
+                entry = name
+            } else {
+                entry = "zip (unreadable entry name)"
+            }
+        }
+        return (file, sizeLabel, entry)
     }
 }
 
