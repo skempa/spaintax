@@ -2,6 +2,18 @@
 
 **Put the phone down. Your creature is waiting.**
 
+> **Two apps live in this project.** **CORELite** ("CORE Focus") is the
+> active MVP: draw a creature → it lives in your room via AR → focus
+> time off your phone earns Growth Points → the creature evolves at
+> point thresholds. No combat, no adventure — it exists to test the
+> core hypothesis (spec §30) as simply as possible. **CORE** is the
+> full game described below, parked but kept building as version 2's
+> foundation. After `xcodegen generate`, pick the **CORELite** scheme
+> for the MVP. Lite adds Focus Sessions (15/25/45/60 min; locking the
+> phone keeps a session alive, app-switching past a 30 s grace ends it,
+> completed minutes always bank) on top of the shared daily
+> Attention Score, which converts to points each morning.
+
 CORE is an iOS AR creature-collection RPG where real-world screen-time
 behaviour determines how much gameplay you earn. You draw a creature, AI
 brings it to life with one of six elemental Cores, and it lives in your

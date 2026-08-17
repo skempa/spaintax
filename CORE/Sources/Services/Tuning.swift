@@ -46,6 +46,32 @@ enum Tuning {
     static let goodDayScore = 70.0
     /// Attention Score at or below this counts as a "bad day".
     static let badDayScore = 35.0
+
+    // MARK: CORE Lite (focus → Growth Points → evolution)
+
+    /// Daily award: earned Adventure Time seconds ÷ this = points.
+    /// 5:00 day → 10 pts, exceptional 7:00 → 14, floor 1:00 → 2.
+    static let liteSecondsPerPoint = 30
+    /// Focus sessions: one point per this many completed minutes.
+    static let focusMinutesPerPoint = 5
+    /// Selectable focus session lengths, minutes.
+    static let focusSessionLengths = [15, 25, 45, 60]
+    /// Brief app-switches that do NOT end a focus session (checking a
+    /// notification). Locking the phone never ends a session — that's
+    /// the desired behaviour.
+    static let focusGraceSeconds: TimeInterval = 30
+    /// Cumulative points to reach each stage: Origin, Awakened, Ascended.
+    static let evolutionPointThresholds = [0, 100, 300]
+
+    static func litePoints(forEarnedSeconds seconds: Int) -> Int {
+        max(1, seconds / liteSecondsPerPoint)
+    }
+
+    static func liteStage(forPoints points: Int) -> EvolutionStage {
+        if points >= evolutionPointThresholds[2] { return .ascended }
+        if points >= evolutionPointThresholds[1] { return .awakened }
+        return .origin
+    }
 }
 
 /// Pure Attention Score / Adventure Time calculator.

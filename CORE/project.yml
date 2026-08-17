@@ -24,6 +24,39 @@ settings:
 # ---------------------------------------------------------------------------
 
 targets:
+  # ---------------------------------------------------------------
+  # CORELite — the active MVP. Draw a creature, it lives in your room
+  # via AR, real-world focus earns Growth Points, points evolve it.
+  # No combat, no adventure. Shares Models/Services with CORE.
+  # ---------------------------------------------------------------
+  CORELite:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+        excludes:
+          - "App/**"        # full game's @main + AppState
+          - "Features/**"   # adventure, combat, camp — full game only
+      - LiteApp
+    info:
+      path: Config/Lite-Info.plist
+      properties:
+        CFBundleDisplayName: CORE Focus
+        UILaunchScreen: {}
+        UIRequiredDeviceCapabilities: [arkit]
+        NSCameraUsageDescription: >-
+          CORE uses the camera to place your creature in your room.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.core.lite
+
+  # ---------------------------------------------------------------
+  # CORE — the full game (adventure/combat), parked but kept building
+  # as the foundation for version 2.
+  # ---------------------------------------------------------------
   CORE:
     type: application
     platform: iOS

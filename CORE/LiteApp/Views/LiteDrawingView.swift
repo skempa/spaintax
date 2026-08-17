@@ -1,14 +1,14 @@
 import SwiftUI
 import PencilKit
 
-/// Freehand finger-drawing canvas. Encourages creativity, offers only
-/// gentle guidance: "Draw your companion."
-struct DrawingCanvasView: View {
-    @EnvironmentObject private var appState: AppState
+/// Freehand drawing canvas — Lite variant of the full game's screen,
+/// built on the shared CanvasRepresentable.
+struct LiteDrawingView: View {
+    @EnvironmentObject private var app: LiteAppState
 
     @State private var canvasView = PKCanvasView()
     @State private var selectedColor: Color = .white
-    @State private var strokeWidth: CGFloat = 8
+    @State private var strokeWidth: CGFloat = 10
     @State private var canvasSize: CGSize = .zero
     @State private var showNamePrompt = false
     @State private var creatureName = ""
@@ -19,15 +19,14 @@ struct DrawingCanvasView: View {
     ]
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 12) {
             Text("Draw your companion")
                 .font(.title2.bold())
                 .foregroundStyle(.white)
                 .padding(.top, 16)
-            Text("Anything goes. It will come to life exactly as you imagine it.")
+            Text("A blob with legs is perfect. Fill it with colour for a richer creature.")
                 .font(.footnote)
                 .foregroundStyle(.white.opacity(0.6))
-                .padding(.bottom, 12)
 
             GeometryReader { geo in
                 CanvasRepresentable(
@@ -43,7 +42,6 @@ struct DrawingCanvasView: View {
             }
             .padding(.horizontal, 16)
 
-            // Palette + tools
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(palette.indices, id: \.self) { index in
@@ -57,25 +55,17 @@ struct DrawingCanvasView: View {
                 }
                 .padding(.horizontal, 20)
             }
-            .frame(height: 50)
-            .padding(.top, 12)
+            .frame(height: 44)
 
             HStack(spacing: 20) {
-                Slider(value: $strokeWidth, in: 3...24) {
-                    Text("Stroke width")
-                }
-                .frame(width: 140)
-                .tint(.white.opacity(0.7))
-
+                Slider(value: $strokeWidth, in: 3...26)
+                    .frame(width: 140)
+                    .tint(.white.opacity(0.7))
                 Button("Undo") { canvasView.undoManager?.undo() }
-                Button("Clear") {
-                    canvasView.drawing = PKDrawing()
-                    hasInk = false
-                }
+                Button("Clear") { canvasView.drawing = PKDrawing(); hasInk = false }
             }
             .font(.subheadline)
             .foregroundStyle(.white.opacity(0.8))
-            .padding(.vertical, 8)
 
             Button {
                 showNamePrompt = true
@@ -95,7 +85,7 @@ struct DrawingCanvasView: View {
             TextField("Name", text: $creatureName)
             Button("Create") {
                 let name = creatureName.trimmingCharacters(in: .whitespaces)
-                appState.createCreature(from: DrawingSubmission(
+                app.createCreature(from: DrawingSubmission(
                     drawing: canvasView.drawing,
                     canvasSize: canvasSize,
                     name: name.isEmpty ? "Companion" : name
@@ -105,10 +95,10 @@ struct DrawingCanvasView: View {
         } message: {
             Text("This is permanent — your companion stays with you.")
         }
-        .alert("Generation failed", isPresented: .constant(appState.generationError != nil)) {
-            Button("OK") { appState.generationError = nil }
+        .alert("Generation failed", isPresented: .constant(app.generationError != nil)) {
+            Button("OK") { app.generationError = nil }
         } message: {
-            Text(appState.generationError ?? "")
+            Text(app.generationError ?? "")
         }
     }
 }

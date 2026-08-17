@@ -1,0 +1,319 @@
+import SwiftUI
+import RealityKit
+import ARKit
+
+/// The home screen IS the companion: your creature standing in your room,
+/// with points, streak and focus controls layered over it.
+struct CompanionView: View {
+    @EnvironmentObject private var app: LiteAppState
+    @State private var showFocus = false
+    @State private var showSettings = false
+
+    private var arAvailable: Bool {
+        #if targetEnvironment(simulator)
+        return false
+        #else
+        return ARWorldTrackingConfiguration.isSupported
+        #endif
+    }
+
+    var body: some View {
+        guard let creature = app.creature else { return AnyView(EmptyView()) }
+
+        return AnyView(ZStack {
+            if arAvailable {
+                ARCompanionView(creature: creature, stage: app.stage)
+                    .ignoresSafeArea()
+            } else {
+                // Simulator / no-AR fallback: a quiet 2D home.
+                LinearGradient(
+                    colors: [Color(red: 0.05, green: 0.08, blue: 0.15), Color(red: 0.02, green: 0.10, blue: 0.06)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                CreatureSpriteView(creature: creature, size: 200)
+                    .offset(y: 40)
+            }
+
+            VStack {
+                statusCard(creature)
+                Spacer()
+                bottomControls(creature)
+            }
+            .padding()
+        }
+        .sheet(isPresented: $showFocus) { FocusSessionView() }
+        .sheet(isPresented: $showSettings) { LiteSettingsView() }
+        .fullScreenCover(item: $app.celebration) { stage in
+            LiteEvolutionView(stage: stage)
+        }
+        .onAppear { app.refreshDaily() })
+    }
+
+    // MARK: - Status
+
+    private func statusCard(_ creature: Creature) -> some View {
+        VStack(spacing: 10) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(creature.name)
+                        .font(.title2.bold())
+                    Text("\(app.stage.displayName) · \(app.lite.growthPoints) Growth Points")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.65))
+                }
+                Spacer()
+                ConditionBadge(condition: creature.condition)
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape.fill")
+                        .foregroundStyle(.white.opacity(0.6))
+                }
+            }
+
+            // Progress to the next evolution — the single number that matters.
+            if let next = app.nextThreshold {
+                VStack(spacing: 4) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(.white.opacity(0.15))
+                            Capsule()
+                                .fill(creature.cores.first?.color ?? .cyan)
+                                .frame(width: geo.size.width * app.evolutionProgress)
+                        }
+                    }
+                    .frame(height: 10)
+                    Text("\(next - app.lite.growthPoints) points to evolution")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.55))
+                }
+            } else {
+                Text("✨ Fully evolved — keep the streak alive")
+                    .font(.caption)
+                    .foregroundStyle(.yellow.opacity(0.85))
+            }
+
+            HStack(spacing: 14) {
+                statChip("🌅", "+\(app.todayProvisionalPoints) today")
+                statChip("🔥", "\(app.lite.streak)-day streak")
+                statChip("🧘", "\(app.lite.focusMinutesTotal)m focused")
+                Spacer()
+            }
+        }
+        .padding(16)
+        .background(.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 20))
+        .foregroundStyle(.white)
+    }
+
+    private func statChip(_ symbol: String, _ text: String) -> some View {
+        HStack(spacing: 4) {
+            Text(symbol).font(.caption)
+            Text(text).font(.caption.weight(.medium))
+        }
+        .foregroundStyle(.white.opacity(0.8))
+    }
+
+    // MARK: - Controls
+
+    private func bottomControls(_ creature: Creature) -> some View {
+        VStack(spacing: 10) {
+            Text(creature.condition.campMessage(name: creature.name, improving: app.isImproving))
+                .font(.footnote)
+                .foregroundStyle(.white.opacity(0.75))
+                .shadow(radius: 3)
+            Button {
+                showFocus = true
+            } label: {
+                Label("Start a Focus Session", systemImage: "leaf.fill")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(colors: [.mint, .green], startPoint: .leading, endPoint: .trailing),
+                        in: Capsule()
+                    )
+                    .foregroundStyle(.black)
+            }
+        }
+    }
+}
+
+extension EvolutionStage: Identifiable {
+    var id: Int { rawValue }
+}
+
+// MARK: - AR layer
+
+/// The creature anchored to the player's floor — same voxel pipeline as
+/// the full game, plus per-stage adornments so evolution is visible in AR.
+struct ARCompanionView: UIViewRepresentable {
+    let creature: Creature
+    let stage: EvolutionStage
+
+    func makeUIView(context: Context) -> ARView {
+        let arView = ARView(frame: .zero)
+        let config = ARWorldTrackingConfiguration()
+        config.planeDetection = [.horizontal]
+        config.environmentTexturing = .automatic
+        arView.session.run(config)
+
+        let coaching = ARCoachingOverlayView()
+        coaching.session = arView.session
+        coaching.goal = .horizontalPlane
+        coaching.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        arView.addSubview(coaching)
+
+        context.coordinator.arView = arView
+        context.coordinator.place(creature: creature, stage: stage)
+        return arView
+    }
+
+    func updateUIView(_ uiView: ARView, context: Context) {
+        context.coordinator.updateStage(stage, creature: creature)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    @MainActor
+    final class Coordinator {
+        weak var arView: ARView?
+        private var anchor: AnchorEntity?
+        private var creatureEntity: ModelEntity?
+        private var adornments: Entity?
+        private var currentStage: EvolutionStage = .origin
+        private var wanderTimer: Timer?
+        private var orbitTimer: Timer?
+
+        deinit {
+            wanderTimer?.invalidate()
+            orbitTimer?.invalidate()
+        }
+
+        func place(creature: Creature, stage: EvolutionStage) {
+            guard let arView else { return }
+            let anchor = AnchorEntity(plane: .horizontal, minimumBounds: [0.3, 0.3])
+            let entity = makeCreatureEntity(creature: creature, stage: stage)
+            anchor.addChild(entity)
+            arView.scene.addAnchor(anchor)
+            self.anchor = anchor
+            self.creatureEntity = entity
+            currentStage = stage
+            addAdornments(for: stage, creature: creature)
+            startIdle()
+            startWander()
+        }
+
+        func updateStage(_ stage: EvolutionStage, creature: Creature) {
+            guard stage != currentStage else { return }
+            currentStage = stage
+            addAdornments(for: stage, creature: creature)
+            // Evolution grows the creature slightly.
+            if let entity = creatureEntity {
+                var transform = entity.transform
+                transform.scale = SIMD3(repeating: scaleFactor(for: stage))
+                entity.move(to: transform, relativeTo: entity.parent, duration: 1.2, timingFunction: .easeInOut)
+            }
+        }
+
+        private func scaleFactor(for stage: EvolutionStage) -> Float {
+            switch stage {
+            case .origin:   return 1.0
+            case .awakened: return 1.12
+            case .ascended: return 1.25
+            }
+        }
+
+        private func makeCreatureEntity(creature: Creature, stage: EvolutionStage) -> ModelEntity {
+            let height: Float = 0.30 * Float(creature.appearance.scale)
+            let entity: ModelEntity
+            if let image = GameStore.shared.loadImage(named: creature.appearance.processedImageFile),
+               let grid = VoxelExtractor.fromDrawing(image),
+               let voxel = try? VoxelMeshBuilder.entity(for: grid, targetHeight: height) {
+                entity = voxel
+            } else {
+                entity = ModelEntity(
+                    mesh: .generateBox(size: height * 0.6),
+                    materials: [SimpleMaterial(color: .white, isMetallic: false)]
+                )
+                entity.position.y = height * 0.3
+            }
+            entity.scale *= scaleFactor(for: stage)
+
+            let shadowMesh = MeshResource.generatePlane(width: height * 0.9, depth: height * 0.6)
+            var shadowMaterial = UnlitMaterial()
+            shadowMaterial.color = .init(tint: UIColor.black.withAlphaComponent(0.35))
+            let shadow = ModelEntity(mesh: shadowMesh, materials: [shadowMaterial])
+            shadow.position = [0, 0.005, 0]
+            entity.addChild(shadow)
+            return entity
+        }
+
+        /// Awakened: orbiting Core motes. Ascended: a second, faster orbit.
+        private func addAdornments(for stage: EvolutionStage, creature: Creature) {
+            adornments?.removeFromParent()
+            adornments = nil
+            orbitTimer?.invalidate()
+            guard stage >= .awakened, let creatureEntity else { return }
+
+            let holder = Entity()
+            let rings = stage == .ascended ? 2 : 1
+            for ring in 0..<rings {
+                let orbit = Entity()
+                orbit.name = "orbit\(ring)"
+                let motes = 3 + ring * 2
+                let radius: Float = 0.14 + Float(ring) * 0.05
+                let color = UIColor(creature.cores.first?.color ?? .cyan)
+                for i in 0..<motes {
+                    let mote = ModelEntity(
+                        mesh: .generateSphere(radius: 0.008),
+                        materials: [UnlitMaterial(color: color.withAlphaComponent(0.9))]
+                    )
+                    let angle = Float(i) / Float(motes) * 2 * .pi
+                    mote.position = [cos(angle) * radius, 0.16 + Float(ring) * 0.06, sin(angle) * radius]
+                    orbit.addChild(mote)
+                }
+                holder.addChild(orbit)
+            }
+            creatureEntity.addChild(holder)
+            adornments = holder
+
+            // Slow orbital spin, opposite directions per ring.
+            orbitTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let holder = self?.adornments else { return }
+                    for (index, orbit) in holder.children.enumerated() {
+                        let direction: Float = index % 2 == 0 ? 1 : -1
+                        orbit.transform.rotation *= simd_quatf(angle: direction * 0.02, axis: [0, 1, 0])
+                    }
+                }
+            }
+        }
+
+        private func startIdle() {
+            guard let entity = creatureEntity else { return }
+            var up = entity.transform
+            up.translation.y += 0.02
+            entity.move(to: up, relativeTo: entity.parent, duration: 1.4, timingFunction: .easeInOut)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self, let entity = self.creatureEntity else { return }
+                var down = entity.transform
+                down.translation.y -= 0.02
+                entity.move(to: down, relativeTo: entity.parent, duration: 1.4, timingFunction: .easeInOut)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.startIdle()
+                }
+            }
+        }
+
+        private func startWander() {
+            wanderTimer = Timer.scheduledTimer(withTimeInterval: 7, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let entity = self.creatureEntity else { return }
+                    var transform = entity.transform
+                    transform.translation.x = Float.random(in: -0.2...0.2)
+                    transform.translation.z = Float.random(in: -0.2...0.2)
+                    entity.move(to: transform, relativeTo: entity.parent, duration: 3.5, timingFunction: .easeInOut)
+                }
+            }
+        }
+    }
+}

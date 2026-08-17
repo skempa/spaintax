@@ -31,6 +31,10 @@ struct GameState: Codable {
     var hasCompletedOnboarding = false
     var hasCompletedTutorialBattle = false
 
+    /// Progress for the simplified CORE Lite app (draw → focus → evolve).
+    /// Optional so saves from the full game keep decoding unchanged.
+    var lite: LiteProgress?
+
     // MARK: - Fragments
 
     func fragmentCount(for core: ElementalCore) -> Int {
@@ -55,6 +59,27 @@ struct GameState: Codable {
     mutating func addItem(_ kind: ItemKind, count: Int = 1) {
         items[kind.rawValue] = (items[kind.rawValue] ?? 0) + count
     }
+}
+
+/// CORE Lite progression: Growth Points from daily behaviour and focus
+/// sessions drive evolution directly — no combat, no fragments.
+struct LiteProgress: Codable, Equatable {
+    var growthPoints: Int = 0
+    /// Day (yyyy-MM-dd) whose *previous* day has been scored and awarded.
+    var pointsAwardedDay: String = ""
+    var focusMinutesTotal: Int = 0
+    /// Consecutive good days (Attention Score ≥ Tuning.goodDayScore).
+    var streak: Int = 0
+    /// Last evolution stage celebrated, so each threshold fires once.
+    var celebratedStage: Int = 1
+    /// Active focus session, persisted so a killed app can reconcile.
+    var activeFocus: FocusRecord?
+}
+
+/// A focus session in flight (or being reconciled after relaunch).
+struct FocusRecord: Codable, Equatable {
+    var startedAt: Date
+    var minutes: Int
 }
 
 /// One day of real-world behaviour and the resulting reward.
