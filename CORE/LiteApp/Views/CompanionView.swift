@@ -1,6 +1,7 @@
 import SwiftUI
 import RealityKit
 import ARKit
+import SceneKit
 
 /// The home screen IS the companion: your creature standing in your room,
 /// with points, streak and focus controls layered over it.
@@ -35,8 +36,16 @@ struct CompanionView: View {
                     startPoint: .top, endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                if let conceptFile = creature.appearance.conceptImageFile,
-                   let concept = GameStore.shared.loadImage(named: conceptFile) {
+                // Without AR, still show the best available version:
+                // HD model (interactive 3D) → concept art → drawing sprite.
+                if let modelFile = creature.appearance.tripoModelFile,
+                   case let url = GameStore.shared.directory.appendingPathComponent(modelFile),
+                   FileManager.default.fileExists(atPath: url.path) {
+                    HDModelPreview(url: url)
+                        .frame(height: 360)
+                        .offset(y: 30)
+                } else if let conceptFile = creature.appearance.conceptImageFile,
+                          let concept = GameStore.shared.loadImage(named: conceptFile) {
                     Image(uiImage: concept)
                         .resizable()
                         .scaledToFit()
@@ -196,6 +205,33 @@ struct CompanionView: View {
 
 extension EvolutionStage: Identifiable {
     var id: Int { rawValue }
+}
+
+/// Interactive 3D preview of the generated USDZ for contexts without AR
+/// (simulator, camera denied). SceneKit loads USDZ natively; drag to
+/// orbit, pinch to zoom.
+struct HDModelPreview: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> SCNView {
+        let view = SCNView()
+        view.backgroundColor = .clear
+        view.autoenablesDefaultLighting = true
+        view.allowsCameraControl = true
+        if let scene = try? SCNScene(url: url, options: nil) {
+            view.scene = scene
+            // Gentle turntable so it feels alive even untouched.
+            let spin = CABasicAnimation(keyPath: "rotation")
+            spin.fromValue = SCNVector4(0, 1, 0, 0)
+            spin.toValue = SCNVector4(0, 1, 0, Float.pi * 2)
+            spin.duration = 14
+            spin.repeatCount = .infinity
+            scene.rootNode.addAnimation(spin, forKey: "turntable")
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: SCNView, context: Context) {}
 }
 
 // MARK: - AR layer
