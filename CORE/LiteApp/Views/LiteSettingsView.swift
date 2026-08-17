@@ -53,7 +53,7 @@ struct LiteSettingsView: View {
                         .autocorrectionDisabled()
                         .onSubmit { saveKey() }
                     if keySaved {
-                        Label("Key saved — \"Bring to life in HD\" is available", systemImage: "checkmark.circle.fill")
+                        Label("Key saved — creatures are brought to life in 3D", systemImage: "checkmark.circle.fill")
                             .font(.footnote)
                             .foregroundStyle(Theme.accent)
                     } else if !tripoKey.isEmpty {
@@ -109,16 +109,20 @@ struct LiteSettingsView: View {
                     Button("Save description") { app.setCreatureDescription(descriptionInput) }
                         .disabled(descriptionInput == (app.creature?.creatureDescription ?? ""))
                     if app.creature?.appearance.tripoModelFile != nil {
-                        Button("Regenerate HD model", role: .destructive) {
+                        Button("Regenerate the creature", role: .destructive) {
                             app.setCreatureDescription(descriptionInput)
                             app.discardHDModel()
+                            app.describeDraft = descriptionInput
                             dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                app.screen = .describing
+                            }
                         }
                     }
                 } header: {
                     Text("Creature")
                 } footer: {
-                    Text("Your description steers the HD generation; the game-art style and rig-friendly pose are added automatically. Regenerating discards the current HD model (blocks return until the new run finishes) and spends Tripo credits.")
+                    Text("Your description says what the creature is; the art style and rig-friendly pose are added automatically. Regenerating discards the current 3D model (blocks return until the new one arrives) and spends Tripo credits.")
                 }
 
                 if let diag = hdModelDiagnostics() {
@@ -135,6 +139,7 @@ struct LiteSettingsView: View {
 
                 Section("About") {
                     LabeledContent("Version", value: "Lite 0.1 (MVP)")
+                    LabeledContent("Generation pipeline", value: TripoCreatureEnhancer.pipelineRevision)
                     Text("Put the phone down. Your creature is growing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)

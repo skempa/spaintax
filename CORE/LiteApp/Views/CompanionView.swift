@@ -10,8 +10,14 @@ struct CompanionView: View {
     @EnvironmentObject private var app: LiteAppState
     @State private var showFocus = false
     @State private var showSettings = false
-    @State private var showEnhance = false
     @State private var hdError: String?
+
+    /// While a spawn is in flight and concept art exists, the AR view
+    /// shows it as a ghost standing where the model will appear.
+    private var ghostConceptFile: String? {
+        guard app.isSpawning else { return nil }
+        return app.spawnRecord?.conceptFile
+    }
 
     private var arAvailable: Bool {
         #if targetEnvironment(simulator)
@@ -26,9 +32,9 @@ struct CompanionView: View {
 
         return AnyView(ZStack {
             if arAvailable {
-                ARCompanionView(creature: creature, stage: app.stage, onHDError: { message in
-                    hdError = message
-                })
+                ARCompanionView(creature: creature, stage: app.stage,
+                                ghostConceptFile: ghostConceptFile,
+                                onHDError: { message in hdError = message })
                 .ignoresSafeArea()
             } else {
                 // Simulator / no-AR fallback: a quiet 2D home.
@@ -50,6 +56,7 @@ struct CompanionView: View {
                         .frame(width: 230)
                         .clipShape(RoundedRectangle(cornerRadius: 18))
                         .shadow(color: (creature.cores.first?.color ?? .cyan).opacity(0.6), radius: 18)
+                        .opacity(app.isSpawning ? 0.55 : 1)
                         .offset(y: 40)
                 } else {
                     CreatureSpriteView(creature: creature, size: 200)
@@ -59,6 +66,9 @@ struct CompanionView: View {
 
             VStack {
                 statusCard(creature)
+                if app.isSpawning || app.spawnFailedMessage != nil {
+                    SpawnStatusPill()
+                }
                 if let hdError {
                     hdErrorBanner(hdError)
                 }
@@ -69,7 +79,6 @@ struct CompanionView: View {
         }
         .sheet(isPresented: $showFocus) { FocusSessionView() }
         .sheet(isPresented: $showSettings) { LiteSettingsView() }
-        .sheet(isPresented: $showEnhance) { EnhanceSheet() }
         .fullScreenCover(item: $app.celebration) { stage in
             LiteEvolutionView(stage: stage)
         }
@@ -145,6 +154,8 @@ struct CompanionView: View {
                 Button("Retry generation") {
                     app.discardHDModel()
                     hdError = nil
+                    app.describeDraft = app.creature?.creatureDescription ?? ""
+                    app.screen = .describing
                 }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.accent)
@@ -172,11 +183,12 @@ struct CompanionView: View {
                 .font(.footnote)
                 .foregroundStyle(Theme.text)
                 .shadow(radius: 3)
-            if creature.appearance.tripoModelFile == nil {
+            if creature.appearance.tripoModelFile == nil && !app.isSpawning && app.spawnFailedMessage == nil {
                 Button {
-                    showEnhance = true
+                    app.describeDraft = creature.creatureDescription ?? ""
+                    app.screen = .describing
                 } label: {
-                    Text("✨ Bring to life in HD")
+                    Text("✨ Bring it to life")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -237,6 +249,9 @@ struct HDModelPreview: UIViewRepresentable {
 struct ARCompanionView: UIViewRepresentable {
     let creature: Creature
     let stage: EvolutionStage
+    /// Concept-art file to show as a translucent stand-in while the 3D
+    /// model is still being generated; nil when not spawning.
+    var ghostConceptFile: String? = nil
     var onHDError: (String) -> Void = { _ in }
 
     func makeUIView(context: Context) -> ARView {
@@ -254,13 +269,13 @@ struct ARCompanionView: UIViewRepresentable {
 
         context.coordinator.arView = arView
         context.coordinator.onHDError = onHDError
-        context.coordinator.place(creature: creature, stage: stage)
+        context.coordinator.place(creature: creature, stage: stage, ghostConceptFile: ghostConceptFile)
         return arView
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.updateStage(stage, creature: creature)
-        context.coordinator.reloadIfModelChanged(creature: creature, stage: stage)
+        context.coordinator.reloadIfModelChanged(creature: creature, stage: stage, ghostConceptFile: ghostConceptFile)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -291,7 +306,7 @@ struct ARCompanionView: UIViewRepresentable {
         private var orbitTimer: Timer?
         private var breathing = false
 
-        private enum BodyKind { case tripo, voxel, fallback }
+        private enum BodyKind { case tripo, ghost, voxel, fallback }
 
         /// Extra yaw applied on top of "look at the camera" so the model's
         /// authored front faces the player. Tripo's USDZ forward axis is
@@ -306,7 +321,7 @@ struct ARCompanionView: UIViewRepresentable {
 
         // MARK: Placement
 
-        func place(creature: Creature, stage: EvolutionStage) {
+        func place(creature: Creature, stage: EvolutionStage, ghostConceptFile: String?) {
             guard let arView else { return }
             let anchor = AnchorEntity(plane: .horizontal, minimumBounds: [0.3, 0.3])
             let root = Entity()
@@ -315,9 +330,9 @@ struct ARCompanionView: UIViewRepresentable {
             self.anchor = anchor
             self.creatureRoot = root
             currentStage = stage
-            currentModelKey = Self.modelKey(for: creature)
+            currentModelKey = Self.modelKey(for: creature, ghost: ghostConceptFile)
 
-            installBody(creature: creature, stage: stage)
+            installBody(creature: creature, stage: stage, ghostConceptFile: ghostConceptFile)
             addAdornments(for: stage, creature: creature)
 
             // The plane anchor's world transform is identity until ARKit
@@ -331,17 +346,20 @@ struct ARCompanionView: UIViewRepresentable {
 
         /// After HD generation completes (or a re-generation lands),
         /// replace the body in place with a small "born" scale-in.
-        func reloadIfModelChanged(creature: Creature, stage: EvolutionStage) {
-            let key = Self.modelKey(for: creature)
+        func reloadIfModelChanged(creature: Creature, stage: EvolutionStage, ghostConceptFile: String?) {
+            let key = Self.modelKey(for: creature, ghost: ghostConceptFile)
             guard key != currentModelKey, creatureRoot != nil else { return }
+            let wasGhost = bodyKind == .ghost
             currentModelKey = key
-            installBody(creature: creature, stage: stage, bornAnimation: true)
+            installBody(creature: creature, stage: stage, ghostConceptFile: ghostConceptFile,
+                        bornAnimation: wasGhost || creature.appearance.tripoModelFile != nil)
             addAdornments(for: stage, creature: creature)
             faceCamera(animated: true)
         }
 
-        private static func modelKey(for creature: Creature) -> String {
-            "\(creature.appearance.tripoModelFile ?? "voxel")#\(creature.appearance.tripoModelRevision ?? 0)"
+        private static func modelKey(for creature: Creature, ghost: String?) -> String {
+            let base = creature.appearance.tripoModelFile ?? (ghost.map { "ghost:" + $0 } ?? "voxel")
+            return "\(base)#\(creature.appearance.tripoModelRevision ?? 0)"
         }
 
         func updateStage(_ stage: EvolutionStage, creature: Creature) {
@@ -366,14 +384,15 @@ struct ARCompanionView: UIViewRepresentable {
 
         // MARK: Body
 
-        private func installBody(creature: Creature, stage: EvolutionStage, bornAnimation: Bool = false) {
+        private func installBody(creature: Creature, stage: EvolutionStage,
+                                 ghostConceptFile: String?, bornAnimation: Bool = false) {
             guard let root = creatureRoot else { return }
             body?.removeFromParent()
             adornments?.removeFromParent(); adornments = nil
             root.children.removeAll()
 
             let height: Float = 0.30 * Float(creature.appearance.scale)
-            let (newBody, kind, animated) = makeBody(creature: creature, height: height)
+            let (newBody, kind, animated) = makeBody(creature: creature, height: height, ghostConceptFile: ghostConceptFile)
             bodyKind = kind
             hasSkeletalAnimation = animated
             newBody.scale *= SIMD3(repeating: scaleFactor(for: stage))
@@ -398,10 +417,34 @@ struct ARCompanionView: UIViewRepresentable {
             if !hasSkeletalAnimation { startBreathing() }
         }
 
+        /// A translucent, camera-facing plane showing the concept art — the
+        /// creature's "ghost" standing where its body will appear.
+        private func makeGhostBody(conceptFile: String, height: Float) -> Entity? {
+            let url = GameStore.shared.directory.appendingPathComponent(conceptFile)
+            guard let texture = try? TextureResource.load(contentsOf: url) else { return nil }
+            var material = UnlitMaterial()
+            material.color = .init(tint: UIColor.white.withAlphaComponent(0.5), texture: .init(texture))
+            material.blending = .transparent(opacity: .init(floatLiteral: 0.5))
+            let aspect = Float(texture.width) / Float(max(texture.height, 1))
+            let plane = ModelEntity(
+                mesh: .generatePlane(width: height * aspect, height: height),
+                materials: [material]
+            )
+            plane.position.y = height / 2
+            let holder = Entity()
+            holder.addChild(plane)
+            return holder
+        }
+
         /// Tripo-generated USDZ takes priority: a polished, ideally animated
         /// model. Falls back to the voxel mesh, but never silently — load
         /// failures surface through onHDError.
-        private func makeBody(creature: Creature, height: Float) -> (Entity, BodyKind, animated: Bool) {
+        private func makeBody(creature: Creature, height: Float, ghostConceptFile: String?) -> (Entity, BodyKind, animated: Bool) {
+            if creature.appearance.tripoModelFile == nil,
+               let ghostFile = ghostConceptFile,
+               let ghost = makeGhostBody(conceptFile: ghostFile, height: height) {
+                return (ghost, .ghost, false)
+            }
             if let file = creature.appearance.tripoModelFile {
                 let url = GameStore.shared.directory.appendingPathComponent(file)
                 if !FileManager.default.fileExists(atPath: url.path) {
@@ -452,7 +495,7 @@ struct ARCompanionView: UIViewRepresentable {
             switch bodyKind {
             case .tripo:    return Self.tripoForwardYawOffset
             case .voxel:    return Self.voxelForwardYawOffset
-            case .fallback: return 0
+            case .ghost, .fallback: return 0
             }
         }
 
@@ -523,7 +566,7 @@ struct ARCompanionView: UIViewRepresentable {
         }
 
         private func hop() {
-            guard let body, !hasSkeletalAnimation else { wander(); return }
+            guard let body, !hasSkeletalAnimation, bodyKind != .ghost else { wander(); return }
             var up = body.transform
             up.translation.y += 0.06
             body.move(to: up, relativeTo: body.parent, duration: 0.22, timingFunction: .easeOut)
@@ -536,7 +579,7 @@ struct ARCompanionView: UIViewRepresentable {
         }
 
         private func lookAround() {
-            guard let root = creatureRoot else { return }
+            guard let root = creatureRoot, bodyKind != .ghost else { wander(); return }
             let side: Float = Bool.random() ? 1 : -1
             var t = root.transform
             t.rotation = t.rotation * simd_quatf(angle: side * 0.4, axis: [0, 1, 0])

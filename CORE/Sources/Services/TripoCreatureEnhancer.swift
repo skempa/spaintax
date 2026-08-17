@@ -19,7 +19,7 @@ import UIKit
 @MainActor
 final class TripoCreatureEnhancer: ObservableObject {
 
-    enum Stage: Equatable {
+    enum Stage: Equatable, Hashable {
         case idle
         case uploading
         case conceptArt
