@@ -411,6 +411,8 @@ struct ARCompanionView: UIViewRepresentable {
 
         private func onFrame() {
             frameCounter += 1
+            // makeUIView ran before tracking settled; re-face once it has.
+            if frameCounter == 30 { faceCamera(animated: true) }
             if !floorFound, frameCounter % 15 == 0 { tryFindFloor() }
             if frameCounter % 4 == 0 { updatePointer() }
         }
