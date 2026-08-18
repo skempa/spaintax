@@ -15,9 +15,9 @@ struct LiteOnboardingView: View {
             Page(symbol: "🖍️",
                  title: "Draw a creature",
                  body: "Anything you like. Crude, strange, beautiful — it's yours, and it's permanent."),
-            Page(symbol: "✨",
+            Page(symbol: "🥚",
                  title: "It comes to life",
-                 body: "An AI reads your drawing, paints it, and sculpts it in 3D.\n\nThat part takes a few minutes. We'll give you a nudge when it's ready."),
+                 body: "We paint your creature, sculpt it in 3D, and it hatches from an egg in your room.\n\nThat part takes a few minutes. We'll give you a nudge when it's ready."),
             Page(symbol: "🏠",
                  title: "It lives in your room",
                  body: "Through your camera, your creature stands on your floor and waits for you."),
@@ -33,7 +33,14 @@ struct LiteOnboardingView: View {
             TabView(selection: $page) {
                 ForEach(pages.indices, id: \.self) { index in
                     VStack(spacing: 20) {
-                        Text(pages[index].symbol).font(.system(size: 72))
+                        if index == 0 {
+                            ExampleDrawingView(lineWidth: 8)
+                                .frame(width: 150, height: 150)
+                                .padding(16)
+                                .background(Theme.paper, in: RoundedRectangle(cornerRadius: 24))
+                        } else {
+                            Text(pages[index].symbol).font(.system(size: 72))
+                        }
                         Text(pages[index].title)
                             .font(.largeTitle.bold())
                             .foregroundStyle(Theme.text)
@@ -47,7 +54,7 @@ struct LiteOnboardingView: View {
                 }
             }
             .tabViewStyle(.page)
-            .frame(height: 420)
+            .frame(height: 460)
 
             Spacer()
 

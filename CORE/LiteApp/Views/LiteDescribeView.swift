@@ -71,7 +71,7 @@ struct LiteDescribeView: View {
                     ProgressView().tint(Theme.accent).scaleEffect(0.8)
                     Text("Looking at your drawing…")
                 } else if hasClaudeKey && app.describeError == nil {
-                    Text("Here's what I see — fix anything I got wrong.")
+                    Text("Here's what we see — fix anything we got wrong.")
                 } else {
                     Text("Describe your creature in a sentence.")
                 }
@@ -107,10 +107,10 @@ struct LiteDescribeView: View {
 
     private var claudeKeyPrompt: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Let an AI read your drawing")
+            Text("Let us read your drawing")
                 .font(.headline)
                 .foregroundStyle(Theme.text)
-            Text("Claude looks at what you drew and puts it into words. You'll get to correct it. Needs a Claude API key — stored only in this phone's Keychain.")
+            Text("We look at what you drew and put it into words — you get to correct it. This uses Claude, so it needs a Claude API key, stored only in this phone's Keychain.")
                 .font(.footnote)
                 .foregroundStyle(Theme.textDim)
             SecureField("Claude API key (sk-ant-…)", text: $claudeKeyInput)
@@ -138,10 +138,10 @@ struct LiteDescribeView: View {
 
     private var tripoKeyPrompt: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Bring it to life in 3D")
+            Text("Hatch it in your room")
                 .font(.headline)
                 .foregroundStyle(Theme.text)
-            Text("Tripo turns your creature into a 3D model that stands in your room. Needs a Tripo API key (spends Tripo credits) — stored only in this phone's Keychain. Without one, your creature appears as blocks.")
+            Text("Your creature is sculpted in 3D and hatches from an egg in your room. This uses Tripo, so it needs a Tripo API key (spends Tripo credits) — stored only in this phone's Keychain. Without one, your creature appears as blocks.")
                 .font(.footnote)
                 .foregroundStyle(Theme.textDim)
             SecureField("Tripo API key (tsk_…)", text: $tripoKeyInput)

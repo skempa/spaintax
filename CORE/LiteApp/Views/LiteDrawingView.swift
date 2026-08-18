@@ -7,7 +7,7 @@ struct LiteDrawingView: View {
     @EnvironmentObject private var app: LiteAppState
 
     @State private var canvasView = PKCanvasView()
-    @State private var selectedColor: Color = .white
+    @State private var selectedColor: Color = Theme.crayonOrange
     @State private var strokeWidth: CGFloat = 10
     @State private var canvasSize: CGSize = .zero
     @State private var showNamePrompt = false
@@ -16,7 +16,7 @@ struct LiteDrawingView: View {
     @State private var showSettings = false
 
     private let palette: [Color] = [
-        .white, .red, .orange, .yellow, .green, .mint, .cyan, .blue, .purple, .pink, .brown
+        Theme.ink, .red, Theme.crayonOrange, .yellow, Theme.crayonGreen, .mint, .cyan, Theme.crayonBlue, .purple, .pink, .brown
     ]
 
     var body: some View {
@@ -25,18 +25,18 @@ struct LiteDrawingView: View {
                 Spacer()
                 Text("Draw your companion")
                     .font(.title2.bold())
-                    .foregroundStyle(Theme.text)
+                    .foregroundStyle(Theme.ink)
                 Spacer()
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape.fill")
-                        .foregroundStyle(Theme.textFaint)
+                        .foregroundStyle(Theme.inkFaint)
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
             Text("A blob with legs is perfect. Fill it with colour for a richer creature.")
                 .font(.footnote)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.inkDim)
 
             GeometryReader { geo in
                 CanvasRepresentable(
@@ -45,8 +45,23 @@ struct LiteDrawingView: View {
                     width: strokeWidth,
                     onDrawingChanged: { hasInk = !canvasView.drawing.strokes.isEmpty }
                 )
-                .background(Theme.canvas)
+                .background(Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.inkFaint.opacity(0.4), lineWidth: 1))
+                .overlay {
+                    if !hasInk {
+                        VStack(spacing: 10) {
+                            ExampleDrawingView(lineWidth: 6)
+                                .frame(width: 150, height: 150)
+                            Text("Something like this")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.inkFaint)
+                        }
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                    }
+                }
+                .animation(.easeOut(duration: 0.3), value: hasInk)
                 .onAppear { canvasSize = geo.size }
                 .onChange(of: geo.size) { _, newSize in canvasSize = newSize }
             }
@@ -59,7 +74,8 @@ struct LiteDrawingView: View {
                         Circle()
                             .fill(color)
                             .frame(width: 30, height: 30)
-                            .overlay(Circle().stroke(Theme.accent, lineWidth: selectedColor == color ? 3 : 0))
+                            .overlay(Circle().stroke(Theme.ink, lineWidth: selectedColor == color ? 3 : 0))
+                            .overlay(Circle().stroke(Theme.inkFaint.opacity(0.4), lineWidth: 1))
                             .onTapGesture { selectedColor = color }
                     }
                 }
@@ -75,7 +91,7 @@ struct LiteDrawingView: View {
                 Button("Clear") { canvasView.drawing = PKDrawing(); hasInk = false }
             }
             .font(.subheadline)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.inkDim)
 
             Button {
                 showNamePrompt = true
@@ -87,6 +103,7 @@ struct LiteDrawingView: View {
             .padding(.horizontal, 32)
             .padding(.bottom, 24)
         }
+        .background(Theme.paper.ignoresSafeArea())
         .alert("Name your companion", isPresented: $showNamePrompt) {
             TextField("Name", text: $creatureName)
             Button("Create") {

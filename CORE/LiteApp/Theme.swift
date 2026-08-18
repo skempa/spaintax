@@ -27,6 +27,19 @@ enum Theme {
 
     // Semantic
     static let danger = Color(hex: 0xFF8A80)
+
+    // Light "paper" variant — used only by the drawing screen, where the
+    // player's crayon colours need a bright ground.
+    static let paper     = Color(hex: 0xF6F1E8)
+    static let paperDeep = Color(hex: 0xEDE6D9)
+    static let ink       = Color(hex: 0x2B2B33)
+    static let inkDim    = Color(hex: 0x2B2B33).opacity(0.6)
+    static let inkFaint  = Color(hex: 0x2B2B33).opacity(0.35)
+
+    // Crayon palette for illustrations.
+    static let crayonOrange = Color(hex: 0xF08A4B)
+    static let crayonGreen  = Color(hex: 0x6FAE6A)
+    static let crayonBlue   = Color(hex: 0x5B8FD9)
 }
 
 extension Color {
