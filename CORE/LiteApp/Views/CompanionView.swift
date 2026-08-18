@@ -60,6 +60,11 @@ struct CompanionView: View {
                 }
             }
 
+            if arAvailable {
+                CreaturePointer(pointer: pointer, name: creature.name)
+                    .ignoresSafeArea()
+            }
+
             VStack {
                 statusCard(creature)
                 if app.isSpawning || app.spawnFailedMessage != nil {
