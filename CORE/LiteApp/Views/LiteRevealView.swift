@@ -54,7 +54,7 @@ struct LiteRevealView: View {
                 Button {
                     app.screen = .companion
                 } label: {
-                    Text(spawning && concept == nil ? "Wait in your room" : "Meet it in your room")
+                    Text(spawning ? "Go to the egg" : "Meet it in your room")
                 }
                 .buttonStyle(.primary)
                 .padding(.horizontal, 32)
@@ -85,7 +85,7 @@ struct LiteRevealView: View {
                     .foregroundStyle(Theme.text)
                     .id(app.enhancer.stage)
                     .transition(.opacity)
-                Text("This part takes a minute.")
+                Text("Its egg is already waiting in your room.")
                     .font(.footnote)
                     .foregroundStyle(Theme.textFaint)
             }
@@ -113,7 +113,7 @@ struct LiteRevealView: View {
                     .foregroundStyle(Theme.textDim)
             }
             if app.isSpawning {
-                Text("Now it's taking shape in 3D — a few minutes.\nWe'll let you know when it's ready.")
+                Text("\(creature.name) is in its egg in your room.\nIt hatches when its body is ready — a few minutes. We'll let you know.")
                     .font(.footnote)
                     .foregroundStyle(Theme.textFaint)
                     .multilineTextAlignment(.center)

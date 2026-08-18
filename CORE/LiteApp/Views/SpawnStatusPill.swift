@@ -37,12 +37,12 @@ struct SpawnStatusPill: View {
                     .font(.caption.weight(.semibold))
                     .padding(.top, 2)
                 } else {
-                    Text(app.enhancer.stage.narrative)
+                    Text("\(app.creature?.name ?? "It") is growing in its egg")
                         .font(.footnote.weight(.semibold))
-                        .id(app.enhancer.stage)
-                    Text("A few minutes · we'll notify you")
+                    Text(app.enhancer.stage.narrative + " · we'll notify you when it hatches")
                         .font(.caption2)
                         .foregroundStyle(Theme.textFaint)
+                        .id(app.enhancer.stage)
                 }
             }
             Spacer(minLength: 0)
