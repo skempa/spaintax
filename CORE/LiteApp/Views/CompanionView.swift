@@ -22,47 +22,32 @@ struct CompanionView: View {
         #endif
     }
 
+    enum ViewMode: String, CaseIterable { case room = "Room", model = "Model" }
+    @State private var viewMode: ViewMode = {
+        #if targetEnvironment(simulator)
+        return .model
+        #else
+        return .room
+        #endif
+    }()
+
+    private var showingAR: Bool { arAvailable && viewMode == .room }
+
     var body: some View {
         guard let creature = app.creature else { return AnyView(EmptyView()) }
 
         return AnyView(ZStack {
-            if arAvailable {
+            if showingAR {
                 ARCompanionView(creature: creature, stage: app.stage,
                                 isSpawning: app.isSpawning,
                                 pointer: pointer,
                                 onHDError: { message in hdError = message })
                 .ignoresSafeArea()
-            } else {
-                // Simulator / no-AR fallback: a quiet 2D home.
-                Theme.background
-                    .ignoresSafeArea()
-                // Without AR, still show the best available version:
-                // HD model (interactive 3D) → concept art → drawing sprite.
-                if let modelFile = creature.appearance.tripoModelFile,
-                   case let url = GameStore.shared.directory.appendingPathComponent(modelFile),
-                   FileManager.default.fileExists(atPath: url.path) {
-                    HDModelPreview(url: url)
-                        .frame(height: 360)
-                        .offset(y: 30)
-                } else if let conceptFile = creature.appearance.conceptImageFile,
-                          let concept = GameStore.shared.loadImage(named: conceptFile) {
-                    Image(uiImage: concept)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 230)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .shadow(color: (creature.cores.first?.color ?? .cyan).opacity(0.6), radius: 18)
-                        .opacity(app.isSpawning ? 0.55 : 1)
-                        .offset(y: 40)
-                } else {
-                    CreatureSpriteView(creature: creature, size: 200)
-                        .offset(y: 40)
-                }
-            }
-
-            if arAvailable {
                 CreaturePointer(pointer: pointer, name: creature.name)
                     .ignoresSafeArea()
+            } else {
+                Theme.background.ignoresSafeArea()
+                modelStage(creature)
             }
 
             VStack {
@@ -86,6 +71,43 @@ struct CompanionView: View {
         .onAppear { app.refreshDaily() })
     }
 
+    // MARK: - Model stage (non-AR view of the creature)
+
+    /// The creature outside the room: HD model with drag-to-orbit → egg while
+    /// spawning → concept art → drawing sprite. Also the simulator's home.
+    @ViewBuilder
+    private func modelStage(_ creature: Creature) -> some View {
+        let core = creature.cores.first?.color ?? .cyan
+        if let modelFile = creature.appearance.tripoModelFile,
+           case let url = GameStore.shared.directory.appendingPathComponent(modelFile),
+           FileManager.default.fileExists(atPath: url.path) {
+            HDModelPreview(url: url)
+                .frame(height: 380)
+                .offset(y: 30)
+        } else if app.isSpawning {
+            VStack(spacing: 18) {
+                EggShape(color: core)
+                    .frame(width: 150, height: 195)
+                Text("Growing…")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textFaint)
+            }
+            .offset(y: 40)
+        } else if let conceptFile = creature.appearance.conceptImageFile,
+                  let concept = GameStore.shared.loadImage(named: conceptFile) {
+            Image(uiImage: concept)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 230)
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .shadow(color: core.opacity(0.6), radius: 18)
+                .offset(y: 40)
+        } else {
+            CreatureSpriteView(creature: creature, size: 200)
+                .offset(y: 40)
+        }
+    }
+
     // MARK: - Status
 
     private func statusCard(_ creature: Creature) -> some View {
@@ -100,6 +122,9 @@ struct CompanionView: View {
                 }
                 Spacer()
                 ConditionBadge(condition: creature.condition)
+                if arAvailable {
+                    viewToggle
+                }
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape.fill")
                         .foregroundStyle(Theme.textDim)
@@ -174,6 +199,25 @@ struct CompanionView: View {
             Text(text).font(.caption.weight(.medium))
         }
         .foregroundStyle(Theme.textDim)
+    }
+
+    private var viewToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(ViewMode.allCases, id: \.self) { mode in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) { viewMode = mode }
+                } label: {
+                    Text(mode.rawValue)
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(viewMode == mode ? Theme.accent : Color.clear, in: Capsule())
+                        .foregroundStyle(viewMode == mode ? Theme.onAccent : Theme.textDim)
+                }
+            }
+        }
+        .padding(2)
+        .background(Theme.surface, in: Capsule())
     }
 
     // MARK: - Controls

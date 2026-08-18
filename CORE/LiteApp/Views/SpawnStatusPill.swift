@@ -54,3 +54,34 @@ struct SpawnStatusPill: View {
         .animation(.easeInOut, value: app.enhancer.stage)
     }
 }
+
+/// A 2D egg for non-AR surfaces (model view, simulator) while spawning.
+struct EggShape: View {
+    let color: Color
+    @State private var rock = false
+
+    var body: some View {
+        ZStack {
+            Ellipse()
+                .fill(
+                    LinearGradient(colors: [color.opacity(0.9), color.opacity(0.55)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .overlay(
+                    Ellipse().stroke(Color.white.opacity(0.35), lineWidth: 2)
+                )
+                .shadow(color: color.opacity(0.5), radius: 20)
+            ForEach(0..<7, id: \.self) { i in
+                Circle()
+                    .fill(color.opacity(0.35))
+                    .frame(width: 10, height: 8)
+                    .offset(x: CGFloat([-30, 22, -10, 35, -38, 5, 25][i]),
+                            y: CGFloat([-50, -30, 10, 30, 40, 60, -70][i]))
+            }
+        }
+        .rotationEffect(.degrees(rock ? 3 : -3), anchor: .bottom)
+        .onAppear {
+            withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) { rock = true }
+        }
+    }
+}
