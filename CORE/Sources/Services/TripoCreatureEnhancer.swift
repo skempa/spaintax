@@ -94,34 +94,28 @@ final class TripoCreatureEnhancer: ObservableObject {
 
     /// Bumped with every pipeline change; shown in the UI so stale-build
     /// confusion is impossible.
-    static let pipelineRevision = "r8"
+    static let pipelineRevision = "r9"
 
     static let conceptFileName = "creature-concept.png"
     static let modelFileName = "creature-tripo.usdz"
 
     // MARK: Prompt
 
-    /// The locked foundation: every creature comes out in this one style
-    /// regardless of what was drawn. The player's description only says
-    /// *what* the creature is; this says *how* it is rendered.
-    static let styleBlock = """
-    soft, rounded, stylized 3D collectible creature, \
-    matte hand-painted textures with a gentle rim light, \
-    friendly proportions with a slightly oversized head and expressive eyes, \
-    clean readable silhouette, cohesive palette drawn from the sketch, \
-    single character, plain neutral background, polished game asset
-    """
-    /// Always last — Tripo's own auto-rig guidance: T-pose, limbs separated.
-    static let poseBlock = """
-    standing upright in T-pose, arms spread away from the body, \
-    legs slightly apart, limbs clearly separated from the torso, \
-    full body, plain background
+    /// The hidden foundation: every creature is rendered in this one style.
+    /// The player only ever writes the "creature specific" line and never
+    /// sees the rest.
+    static let foundationBlock = """
+    Professional creature design for a monster-collecting RPG, in the polished style of Pokemon and Digimon official art. \
+    Reimagine this child's sketch as a real game creature:
+    1. General style: Cute but cool, chunky rounded body, expressive face. Full body view, standing in a T pose, \
+    clean plain light background, vibrant colors, high quality cel-shaded game art. \
+    Needs to be the juvenile (first form) version of this creature.
     """
 
     static func prompt(description: String?) -> String {
         let trimmed = description?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let subject = trimmed.isEmpty ? nil : "Creature: \(trimmed)."
-        return ([subject, styleBlock, poseBlock].compactMap { $0 }).joined(separator: ", ")
+        guard !trimmed.isEmpty else { return foundationBlock }
+        return foundationBlock + "\n2. Creature specific: " + trimmed
     }
 
     // MARK: Run / resume
@@ -264,8 +258,12 @@ final class TripoCreatureEnhancer: ObservableObject {
             record.modelTaskID = try await client.createTask("generation/image-to-model", body: [
                 "file": modelInput,
                 "model": Self.modelVersion,
+                // Style survives even if concept art was skipped.
+                "prompt": Self.prompt(description: record.description),
                 "texture": true,
-                "pbr": true,
+                "texture_quality": "detailed",
+                // Diffuse-only: pbr maps read as glossy porcelain in AR.
+                "pbr": false,
                 // Without a face limit Tripo returns ~1.4M triangles — enough
                 // to hang RealityKit on older phones. 60k renders identically
                 // at creature size (the normal map carries the detail).
