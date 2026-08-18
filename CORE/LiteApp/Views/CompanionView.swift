@@ -643,41 +643,55 @@ struct ARCompanionView: UIViewRepresentable {
 
         // MARK: Egg
 
+        /// The bundled speckled egg (Resources/egg.usdz), scaled to sit on the
+        /// floor, with a faint Core-colour glow so it reads as *this*
+        /// creature's egg. Falls back to a procedural ovoid if the asset
+        /// can't be loaded.
         private func makeEgg(creature: Creature, height: Float) -> Entity {
-            let radius = height * 0.42
             let core = UIColor(creature.cores.first?.color ?? .cyan)
+            let eggHeight = height * 0.62
+            let holder = Entity()
+
+            if let url = Bundle.main.url(forResource: "egg", withExtension: "usdz"),
+               let loaded = try? Entity.load(contentsOf: url) {
+                Self.flattenMaterials(in: loaded)
+                Self.tint(loaded, emissive: core, intensity: 0.12)
+                let bounds = loaded.visualBounds(relativeTo: nil)
+                let factor = eggHeight / max(bounds.extents.y, 0.001)
+                loaded.scale *= SIMD3(repeating: factor)
+                loaded.position = [-bounds.center.x * factor, -bounds.min.y * factor, -bounds.center.z * factor]
+                loaded.name = "eggShell"
+                holder.addChild(loaded)
+                return holder
+            }
+
+            // Fallback: procedural ovoid.
+            let radius = eggHeight / 2.64
             var shell = PhysicallyBasedMaterial()
             shell.baseColor = .init(tint: core.blended(withFraction: 0.55, of: .white) ?? core)
             shell.roughness = 0.55
             shell.metallic = 0.0
-            shell.emissiveColor = .init(color: core.withAlphaComponent(1))
+            shell.emissiveColor = .init(color: core)
             shell.emissiveIntensity = 0.18
-
             let egg = ModelEntity(mesh: .generateSphere(radius: radius), materials: [shell])
             egg.scale = [1.0, 1.32, 1.0]
             egg.position.y = radius * 1.32
             egg.name = "eggShell"
-
-            // Speckles: a few flattened dots in a darker shade.
-            var speck = PhysicallyBasedMaterial()
-            speck.baseColor = .init(tint: core.blended(withFraction: 0.15, of: .black) ?? core)
-            speck.roughness = 0.9
-            var rng = SystemRandomNumberGenerator()
-            for i in 0..<10 {
-                let theta = Float(i) / 10 * 2 * .pi + Float.random(in: -0.3...0.3, using: &rng)
-                let phi = Float.random(in: 0.35...0.85, using: &rng) * .pi
-                let dot = ModelEntity(mesh: .generateSphere(radius: radius * 0.09), materials: [speck])
-                dot.position = [sin(phi) * cos(theta) * radius * 0.98,
-                                cos(phi) * radius * 0.98,
-                                sin(phi) * sin(theta) * radius * 0.98]
-                dot.scale = [1, 1, 0.35]
-                dot.look(at: .zero, from: dot.position, relativeTo: nil)
-                egg.addChild(dot)
-            }
-
-            let holder = Entity()
             holder.addChild(egg)
             return holder
+        }
+
+        /// Adds a soft emissive glow to every PBR material in the subtree.
+        private static func tint(_ entity: Entity, emissive: UIColor, intensity: Float) {
+            for child in entity.children { tint(child, emissive: emissive, intensity: intensity) }
+            guard var model = entity.components[ModelComponent.self] else { return }
+            model.materials = model.materials.map { material in
+                guard var pbm = material as? PhysicallyBasedMaterial else { return material }
+                pbm.emissiveColor = .init(color: emissive)
+                pbm.emissiveIntensity = intensity
+                return pbm
+            }
+            entity.components.set(model)
         }
 
         /// Shake, crack, flash — then hand over to the body swap.
@@ -714,19 +728,21 @@ struct ARCompanionView: UIViewRepresentable {
         }
 
         private func makeCracks(on egg: Entity) -> [ModelEntity] {
-            guard let shell = egg.children.first(where: { $0.name == "eggShell" }) as? ModelEntity else { return [] }
-            let radius = (shell.model?.mesh.bounds.extents.x ?? 0.1) / 2
+            guard let shell = egg.children.first(where: { $0.name == "eggShell" }) else { return [] }
+            let bounds = shell.visualBounds(relativeTo: egg)
+            let radius = max(bounds.extents.x, bounds.extents.z) / 2
+            let baseY = bounds.min.y
             var material = UnlitMaterial(color: UIColor(white: 0.12, alpha: 1))
             material.blending = .opaque
             var cracks: [ModelEntity] = []
             for (i, angle) in [Float(0.4), Float(2.2), Float(4.1)].enumerated() {
                 let crack = ModelEntity(mesh: .generateBox(size: [radius * 0.06, radius * 0.9, radius * 0.06]),
                                         materials: [material])
-                crack.position = [cos(angle) * radius * 0.98, radius * (0.1 + Float(i) * 0.15), sin(angle) * radius * 0.98]
+                crack.position = [cos(angle) * radius * 0.98, baseY + radius * (0.9 + Float(i) * 0.3), sin(angle) * radius * 0.98]
                 crack.orientation = simd_quatf(angle: angle + .pi / 2, axis: [0, 1, 0])
                     * simd_quatf(angle: Float(i) * 0.5 - 0.5, axis: [0, 0, 1])
                 crack.scale = .init(repeating: 0.001)
-                shell.addChild(crack)
+                egg.addChild(crack)
                 cracks.append(crack)
             }
             return cracks

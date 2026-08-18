@@ -38,6 +38,8 @@ targets:
           - "App/**"        # full game's @main + AppState
           - "Features/**"   # adventure, combat, camp — full game only
       - LiteApp
+      - path: Resources/egg.usdz
+        buildPhase: resources
     info:
       path: Config/Lite-Info.plist
       properties:
